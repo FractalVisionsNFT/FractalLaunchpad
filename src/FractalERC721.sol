@@ -5,16 +5,12 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {ERC721Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-// Custom errors
-error MaxSupplyReached();
-error MaxSupplyExceeded();
-error NotAuthorized();
 
 // Upgradeable ERC721 implementation for cloning
 contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable {
 
     // Custom errors
-    error MaxSupplyReached();
+    error MaxSupplyBelowCurrentSupply();
     error MaxSupplyExceeded();
     error NotAuthorized();
 
@@ -38,17 +34,22 @@ contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable {
     }
     
     function mint(address _to, uint256 _tokenId) external onlyOwner {
-        if (totalSupply >= maxSupply) revert MaxSupplyReached();
+        if(maxSupply !=0 && totalSupply >= maxSupply) revert MaxSupplyExceeded();   
         totalSupply++;
         _mint(_to, _tokenId);
     }
     
     function batchMint(address _to, uint256[] calldata _tokenIds) external onlyOwner {
-        if (totalSupply + _tokenIds.length > maxSupply) revert MaxSupplyExceeded();
+        if (maxSupply !=0 && totalSupply + _tokenIds.length > maxSupply) revert MaxSupplyExceeded();
         for (uint256 i = 0; i < _tokenIds.length; i++) {
             totalSupply++;
             _mint(_to, _tokenIds[i]);
         }
+    }
+
+    function setMaxSupply(uint256 _maxSupply) external onlyOwner {
+        if (_maxSupply < totalSupply) revert MaxSupplyBelowCurrentSupply();
+        maxSupply = _maxSupply;
     }
     
     function setBaseURI(string calldata _baseURI) external onlyOwner {
@@ -60,7 +61,7 @@ contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable {
     }
 
     function burn(uint256 _tokenId) external {
-        if (!_isAuthorized(msg.sender, msg.sender, _tokenId)) revert NotAuthorized();
+        if (!_isAuthorized(_ownerOf(_tokenId), msg.sender, _tokenId)) revert NotAuthorized();
         totalSupply--;  
         _burn(_tokenId);
     }

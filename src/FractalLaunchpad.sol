@@ -26,7 +26,6 @@ contract FractalLaunchpad is Ownable {
     error InvalidERC1155Implementation();
     error InvalidERC721Implementation();
     error InvalidFactory();
-    error MaxSupplyMustBeGreaterThanZero();
     error InsufficientFee();
     error FailedToSendFee();
     error NoFundsToWithdraw();
@@ -75,7 +74,7 @@ contract FractalLaunchpad is Ownable {
         string memory _baseURI,
         TokenType _tokenType
     ) external payable returns (uint256 launchId) {
-        if (_maxSupply == 0) revert MaxSupplyMustBeGreaterThanZero();
+        // if (_maxSupply == 0) revert MaxSupplyMustBeGreaterThanZero();
         
         launchId = nextLaunchId++;
 
