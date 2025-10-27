@@ -10,43 +10,48 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable {
     uint256 public totalSupply;
     uint256 public maxSupply;
-    string public _baseTokenURI;
-
-    error AlreadyInitialized();
-
+    string public baseTokenURI;
     
     function initialize(
-        string memory name,
-        string memory symbol,
+        string memory _name,
+        string memory _symbol,
         uint256 _maxSupply,
-        string memory baseURI,
-        address owner
+        string memory _baseURI,
+        address _owner
     ) public initializer {
-        __ERC721_init(name, symbol);
-        __Ownable_init(owner);
+        __ERC721_init(_name, _symbol);
+        __Ownable_init(_owner);
         maxSupply = _maxSupply;
-        _baseTokenURI = baseURI;
+        baseTokenURI = _baseURI;
     }
     
-    function mint(address to, uint256 tokenId) external onlyOwner {
+    function mint(address _to, uint256 _tokenId) external onlyOwner {
         require(totalSupply < maxSupply, "Max supply reached");
         totalSupply++;
-        _mint(to, tokenId);
+        _mint(_to, _tokenId);
     }
     
-    function batchMint(address to, uint256[] calldata tokenIds) external onlyOwner {
-        require(totalSupply + tokenIds.length <= maxSupply, "Max supply exceeded");
-        for (uint256 i = 0; i < tokenIds.length; i++) {
+    function batchMint(address _to, uint256[] calldata _tokenIds) external onlyOwner {
+        require(totalSupply + _tokenIds.length <= maxSupply, "Max supply exceeded");
+        for (uint256 i = 0; i < _tokenIds.length; i++) {
             totalSupply++;
-            _mint(to, tokenIds[i]);
+            _mint(_to, _tokenIds[i]);
         }
     }
     
-    function setBaseURI(string calldata baseURI) external onlyOwner {
-        _baseTokenURI = baseURI;
+    function setBaseURI(string calldata _baseURI) external onlyOwner {
+        baseTokenURI = _baseURI;
     }
     
     function _baseURI() internal view override returns (string memory) {
-        return _baseTokenURI;
+        return baseTokenURI;
     }
+
+    function burn(uint256 _tokenId) external {
+        require(_isAuthorized(msg.sender, msg.sender, _tokenId), "Not authorized");
+        totalSupply--;  
+        _burn(_tokenId);
+    }
+
+
 }

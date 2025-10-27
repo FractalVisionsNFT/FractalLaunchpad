@@ -1,25 +1,30 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
-
-    enum SavingsFrequency {Daily, Weekly, BiWeekly, Monthly}
-
 interface IFractalLaunhchpad {
-    function initialize(string memory name, string memory symbol, uint256 _maxSupply, string memory baseURI, address owner) external;
+    function initialize(string memory _name, string memory _symbol, uint256 _maxSupply, string memory _baseURI, address _owner) external;
 }
 
 contract MinimalProxy {
-    event ContractCreated(address indexed newThrift, uint256 position);
+    mapping(address => address[]) public deployerToContracts; //deployer => contract addressses
 
-    mapping(uint256 => address) cloneAddresses;
-    uint256 contractIndex = 1;
+    address[] public allClonedContracts;
 
-    mapping(address => address[]) public _deployerAddrs; //deployer => contract addressses
-
-    address[] allClonedMultiSigContractAddresses;
-
+    /**
+     * @dev Creates a minimal proxy clone of the implementation contract.
+     * @param _implementationContract The address of the implementation contract to clone.
+     * @param _name The name of the token.
+     * @param _symbol The symbol of the token.
+     * @param _maxSupply The maximum supply of the token.
+     * @param _baseURI The base URI for the token metadata.
+     * @param _owner The owner of the cloned contract.
+     */
     function createClone(
         address _implementationContract,
-        string memory name, string memory symbol, uint256 _maxSupply, string memory baseURI, address owner ) external returns (address) {
+        string memory _name, string memory _symbol, uint256 _maxSupply, string memory _baseURI, address _owner ) external returns (address) {
+        
+        require(_implementationContract != address(0), "Invalid implementation");
+        require(_implementationContract.code.length > 0, "Implementation has no code");
+
         // convert the address to 20 bytes
         bytes20 implementationContractInBytes = bytes20(
             _implementationContract
@@ -82,17 +87,13 @@ contract MinimalProxy {
             // code size == 0x37 (55 bytes)
             proxy := create(0, clone, 0x37)
         }
-        IFractalLaunhchpad(proxy).initialize( name, symbol, _maxSupply, baseURI, owner );
+        IFractalLaunhchpad(proxy).initialize( _name, _symbol, _maxSupply, _baseURI, _owner );
 
-        cloneAddresses[contractIndex] = proxy;
 
         // Add the newly deployed contract address to the deployer's array
-        _deployerAddrs[msg.sender].push(proxy);
-        allClonedMultiSigContractAddresses.push(proxy);
+        deployerToContracts[msg.sender].push(proxy);
+        allClonedContracts.push(proxy);
 
-        contractIndex = contractIndex + 1;
-
-        emit ContractCreated(proxy, allClonedMultiSigContractAddresses.length);
         return proxy;
     }
 
@@ -100,20 +101,23 @@ contract MinimalProxy {
      * @dev Returns the clone contract address at the specified index.
      */
     function getCloneAddress(uint256 _index) external view returns (address) {
-        return cloneAddresses[_index];
+        return allClonedContracts[_index];
     }
 
     /**
      * @dev Returns the current index
      */
     function getCurrentIndex() external view returns (uint256) {
-        return allClonedMultiSigContractAddresses.length;
+        return allClonedContracts.length;
     }
-
-    // Check if an address is a clone of a particular contract address
+    /**
+     * @dev Checks if a given address is a clone of a specific implementation contract.
+     * @param _implementationContract The address of the implementation contract.
+     * @param _query The address to check.
+     */
     function isClone(
         address _implementationContract,
-        address query
+        address _query
     ) external view returns (bool result) {
         bytes20 implementationContractInBytes = bytes20(
             _implementationContract
@@ -131,22 +135,25 @@ contract MinimalProxy {
             )
 
             let other := add(clone, 0x40)
-            extcodecopy(query, other, 0, 0x2d)
+            extcodecopy(_query, other, 0, 0x2d)
             result := and(
                 eq(mload(clone), mload(other)),
                 eq(mload(add(clone, 0xd)), mload(add(other, 0xd)))
             )
         }
     }
-
+    /**
+     * @dev Returns all created clone contract addresses.
+     */
     function getAllCreatedAddresses() external view returns (address[] memory) {
-        return allClonedMultiSigContractAddresses;
+        return allClonedContracts;
     }
-
-    function getAllProxiesByDeployer(
-        address deployerAddr
-    ) external view returns (address[] memory) {
-        return _deployerAddrs[deployerAddr];
+    /**
+     * @dev Returns all proxy contract addresses created by a specific deployer.
+     * @param _deployerAddr The address of the deployer whose proxies are to be retrieved.
+     */
+    function getAllProxiesByDeployer( address _deployerAddr) external view returns (address[] memory) {
+        return deployerToContracts[_deployerAddr];
     }
 
     
