@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.24;
 interface IFractalLaunhchpad {
     function initialize(string memory _name, string memory _symbol, uint256 _maxSupply, string memory _baseURI, address _owner) external;
 }
 
 contract MinimalProxy {
+
+    // Custom errors
+    error InvalidImplementation();
+    error ImplementationHasNoCode();
+
     mapping(address => address[]) public deployerToContracts; //deployer => contract addressses
 
     address[] public allClonedContracts;
@@ -22,8 +27,8 @@ contract MinimalProxy {
         address _implementationContract,
         string memory _name, string memory _symbol, uint256 _maxSupply, string memory _baseURI, address _owner ) external returns (address) {
         
-        require(_implementationContract != address(0), "Invalid implementation");
-        require(_implementationContract.code.length > 0, "Implementation has no code");
+        if (_implementationContract == address(0)) revert InvalidImplementation();
+        if (_implementationContract.code.length == 0) revert ImplementationHasNoCode();
 
         // convert the address to 20 bytes
         bytes20 implementationContractInBytes = bytes20(

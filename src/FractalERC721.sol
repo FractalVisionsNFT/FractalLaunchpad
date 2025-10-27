@@ -1,13 +1,25 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.24;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {ERC721Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
+// Custom errors
+error MaxSupplyReached();
+error MaxSupplyExceeded();
+error NotAuthorized();
 
 // Upgradeable ERC721 implementation for cloning
 contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable {
+
+    // Custom errors
+    error MaxSupplyReached();
+    error MaxSupplyExceeded();
+    error NotAuthorized();
+
+
+    // State Variables
     uint256 public totalSupply;
     uint256 public maxSupply;
     string public baseTokenURI;
@@ -26,13 +38,13 @@ contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable {
     }
     
     function mint(address _to, uint256 _tokenId) external onlyOwner {
-        require(totalSupply < maxSupply, "Max supply reached");
+        if (totalSupply >= maxSupply) revert MaxSupplyReached();
         totalSupply++;
         _mint(_to, _tokenId);
     }
     
     function batchMint(address _to, uint256[] calldata _tokenIds) external onlyOwner {
-        require(totalSupply + _tokenIds.length <= maxSupply, "Max supply exceeded");
+        if (totalSupply + _tokenIds.length > maxSupply) revert MaxSupplyExceeded();
         for (uint256 i = 0; i < _tokenIds.length; i++) {
             totalSupply++;
             _mint(_to, _tokenIds[i]);
@@ -48,7 +60,7 @@ contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable {
     }
 
     function burn(uint256 _tokenId) external {
-        require(_isAuthorized(msg.sender, msg.sender, _tokenId), "Not authorized");
+        if (!_isAuthorized(msg.sender, msg.sender, _tokenId)) revert NotAuthorized();
         totalSupply--;  
         _burn(_tokenId);
     }

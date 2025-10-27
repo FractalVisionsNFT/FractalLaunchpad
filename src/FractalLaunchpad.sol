@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.24;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
@@ -10,7 +10,27 @@ import {FractalERC721Impl} from "./FractalERC721.sol";
 import {FractalERC1155Impl} from "./FractalERC1155.sol";
 
 contract FractalLaunchpad is Ownable {
+
+    struct LaunchConfig {
+        TokenType tokenType;
+        address tokenContract;
+        address creator;
+        uint256 maxSupply;
+        string baseURI;
+    }
+
     enum TokenType { ERC721, ERC1155 }
+
+    // Custom errors
+    error InvalidFeeRecipient();
+    error InvalidERC1155Implementation();
+    error InvalidERC721Implementation();
+    error InvalidFactory();
+    error MaxSupplyMustBeGreaterThanZero();
+    error InsufficientFee();
+    error FailedToSendFee();
+    error NoFundsToWithdraw();
+    error FailedToWithdrawFunds();
     
     address public immutable ERC721_IMPLEMENTATION;
     address public immutable ERC1155_IMPLEMENTATION;
@@ -28,35 +48,18 @@ contract FractalLaunchpad is Ownable {
     address[] public allERC1155s;
 
 
-    struct LaunchConfig {
-        TokenType tokenType;
-        address tokenContract;
-        address creator;
-        uint256 maxSupply;
-        string baseURI;
-    }
-
-
     event LaunchCreated(
         uint256  launchId,
         TokenType indexed tokenType,
         address indexed tokenContract,
         address indexed creator
     );
-    
-    event TokensPurchased(
-        uint256 indexed launchId,
-        address indexed buyer,
-        uint256 quantity,
-        uint256 totalCost
-    );
 
     constructor(address _feeRecipient,uint256 _fee, address _erc1155, address _erc721, address _factory) Ownable(msg.sender) {
-        require(_feeRecipient != address(0), "Invalid fee recipient");
-        require(_erc1155 != address(0), "Invalid ERC1155 implementation");
-        require(_erc721 != address(0), "Invalid ERC721 implementation");
-        require(_factory != address(0), "Invalid factory");
-
+        if (_feeRecipient == address(0)) revert InvalidFeeRecipient();
+        if (_erc1155 == address(0)) revert InvalidERC1155Implementation();
+        if (_erc721 == address(0)) revert InvalidERC721Implementation();
+        if (_factory == address(0)) revert InvalidFactory();
 
         feeRecipient = _feeRecipient;
         platformFee = _fee;
@@ -72,15 +75,15 @@ contract FractalLaunchpad is Ownable {
         string memory _baseURI,
         TokenType _tokenType
     ) external payable returns (uint256 launchId) {
-        require(_maxSupply > 0, "Max supply must be > 0");
+        if (_maxSupply == 0) revert MaxSupplyMustBeGreaterThanZero();
         
         launchId = nextLaunchId++;
 
         if(!authorizedCreators[msg.sender] && msg.sender != owner()){
             //charge fee
-            require(msg.value >= platformFee, "Insufficient fee");
+            if (msg.value < platformFee) revert InsufficientFee();
             (bool sent, ) = feeRecipient.call{value: platformFee}("");
-            require(sent, "Failed to send fee");
+            if (!sent) revert FailedToSendFee();
         }
 
         if(_tokenType == TokenType.ERC721) {
@@ -125,14 +128,14 @@ contract FractalLaunchpad is Ownable {
     }
     
     function setFeeRecipient(address _feeRecipient) external onlyOwner {
-        require(_feeRecipient != address(0), "Invalid fee recipient");
+        if (_feeRecipient == address(0)) revert InvalidFeeRecipient();
         feeRecipient = _feeRecipient;
     }
     function withdrawLockedFunds() external onlyOwner {
         uint256 balance = address(this).balance;
-        require(balance > 0, "No funds to withdraw");
+        if (balance == 0) revert NoFundsToWithdraw();
         (bool sent, ) = owner().call{value: balance}("");
-        require(sent, "Failed to withdraw funds");
+        if (!sent) revert FailedToWithdrawFunds();
     }
     
     // View functions

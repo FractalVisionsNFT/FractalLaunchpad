@@ -1,12 +1,19 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.24;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ERC1155Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 
-
 contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable {
+
+    // Custom errors
+    error MaxSupplyExceeded();
+    error MaxSupplyBelowCurrentSupply();
+    error LengthMismatch();
+    error NotAuthorized();
+
+    // State Variables
     string public name;
     string public symbol;
     mapping(uint256 => uint256) public totalSupply;
@@ -36,7 +43,7 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable {
         bytes memory _data
     ) external onlyOwner {
         if (maxSupply[_id] > 0) {
-            require(totalSupply[_id] + _amount <= maxSupply[_id], "Max supply exceeded");
+            if (totalSupply[_id] + _amount > maxSupply[_id]) revert MaxSupplyExceeded();
         }
         totalSupply[_id] += _amount;
         _mint(_to, _id, _amount, _data);
@@ -48,11 +55,11 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable {
         uint256[] memory _amounts,
         bytes memory _data
     ) external onlyOwner {
-        require(_ids.length == _amounts.length, "Length mismatch");
+        if (_ids.length != _amounts.length) revert LengthMismatch();
 
         for (uint256 i = 0; i < _ids.length; i++) {
             if (maxSupply[_ids[i]] > 0) {
-                require(totalSupply[_ids[i]] + _amounts[i] <= maxSupply[_ids[i]], "Max supply exceeded");
+                if (totalSupply[_ids[i]] + _amounts[i] > maxSupply[_ids[i]]) revert MaxSupplyExceeded();
             }
             totalSupply[_ids[i]] += _amounts[i];
         }
@@ -61,7 +68,7 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable {
     }
     
     function setMaxSupply(uint256 _id, uint256 _maxSupply) external onlyOwner {
-        require(_maxSupply >= totalSupply[_id], "Max supply below current supply");
+        if (_maxSupply < totalSupply[_id]) revert MaxSupplyBelowCurrentSupply();
         maxSupply[_id] = _maxSupply;
     }
     
@@ -76,7 +83,7 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable {
     function burn(address _from, uint256 _id, uint256 _amount) external {
         address caller = msg.sender;
 
-        require(_from == caller || isApprovedForAll(_from, caller), "Not authorized");
+        if (_from != caller && !isApprovedForAll(_from, caller)) revert NotAuthorized();
         totalSupply[_id] -= _amount;
         _burn(_from, _id, _amount);
     }
@@ -84,9 +91,8 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable {
     function burnBatch(address _from, uint256[] calldata _ids, uint256[] calldata _amounts) external {
         address caller = msg.sender;
 
-        require(_from == caller || isApprovedForAll(_from, caller), "Not authorized");
-        require(_ids.length == _amounts.length, "Length mismatch");
-
+        if (_from != caller && !isApprovedForAll(_from, caller)) revert NotAuthorized();
+        if (_ids.length != _amounts.length) revert LengthMismatch();
 
         for (uint256 i = 0; i < _ids.length; i++) {
             totalSupply[_ids[i]] -= _amounts[i];
