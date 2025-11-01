@@ -5,7 +5,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {FractalLaunchpad} from "../src/FractalLaunchpad.sol";
 import {MinimalProxy} from "../src/Factory.sol";
 import {FractalERC721Impl} from "../src/FractalERC721.sol";
-import {FractalERC1155Impl} from "../src/FractalERC1155.sol";
+import {LicenseVersion, FractalERC1155Impl} from "../src/FractalERC1155.sol";
 
 contract FractalLaunchpadTest is Test {
     FractalLaunchpad public launchpad;
@@ -131,6 +131,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
         
@@ -160,6 +161,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            LicenseVersion.PUBLIC,
             FractalLaunchpad.TokenType.ERC1155
         );
         
@@ -195,6 +197,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
         
@@ -215,6 +218,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
         
@@ -234,6 +238,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
         
@@ -249,12 +254,14 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             0, // Zero max supply for infinite minting
             BASE_URI,
+            LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
         
         FractalLaunchpad.LaunchConfig memory config = launchpad.getLaunchInfo(launchId);
         assertEq(config.maxSupply, 0);
-        assertEq(uint8(config.tokenType), uint8(FractalLaunchpad.TokenType.ERC721));
+        assertEq(uint8(config.tokenType), uint8(
+            FractalLaunchpad.TokenType.ERC721));
         
         vm.stopPrank();
     }
@@ -268,6 +275,7 @@ contract FractalLaunchpadTest is Test {
             "INFT",
             0, // Infinite minting
             BASE_URI,
+            LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
         
@@ -296,6 +304,7 @@ contract FractalLaunchpadTest is Test {
             "I1155",
             0, // Infinite minting
             BASE_URI,
+            LicenseVersion.PUBLIC,
             FractalLaunchpad.TokenType.ERC1155
         );
         
@@ -322,6 +331,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
         
@@ -330,6 +340,7 @@ contract FractalLaunchpadTest is Test {
             "SNFT",
             500,
             "https://second.com/",
+            LicenseVersion.PUBLIC,
             FractalLaunchpad.TokenType.ERC1155
         );
         
@@ -341,8 +352,10 @@ contract FractalLaunchpadTest is Test {
         FractalLaunchpad.LaunchConfig memory config1 = launchpad.getLaunchInfo(launchId1);
         FractalLaunchpad.LaunchConfig memory config2 = launchpad.getLaunchInfo(launchId2);
         
-        assertEq(uint8(config1.tokenType), uint8(FractalLaunchpad.TokenType.ERC721));
-        assertEq(uint8(config2.tokenType), uint8(FractalLaunchpad.TokenType.ERC1155));
+        assertEq(uint8(config1.tokenType), uint8(
+            FractalLaunchpad.TokenType.ERC721));
+        assertEq(uint8(config2.tokenType), uint8(
+            FractalLaunchpad.TokenType.ERC1155));
         
         vm.stopPrank();
     }
@@ -462,12 +475,14 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
         
         FractalLaunchpad.LaunchConfig memory config = launchpad.getLaunchInfo(launchId);
         
-        assertEq(uint8(config.tokenType), uint8(FractalLaunchpad.TokenType.ERC721));
+        assertEq(uint8(config.tokenType), uint8(
+            FractalLaunchpad.TokenType.ERC721));
         assertEq(config.creator, creator);
         assertEq(config.maxSupply, MAX_SUPPLY);
         assertEq(config.baseURI, BASE_URI);
@@ -485,6 +500,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
         
@@ -493,6 +509,7 @@ contract FractalLaunchpadTest is Test {
             "SNFT",
             500,
             "https://second.com/",
+            LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
         
@@ -511,6 +528,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            LicenseVersion.PUBLIC,
             FractalLaunchpad.TokenType.ERC1155
         );
         
@@ -519,6 +537,7 @@ contract FractalLaunchpadTest is Test {
             "SNFT",
             500,
             "https://second.com/",
+            LicenseVersion.PUBLIC,
             FractalLaunchpad.TokenType.ERC1155
         );
         
@@ -536,6 +555,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
         
@@ -555,6 +575,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            LicenseVersion.PUBLIC,
             FractalLaunchpad.TokenType.ERC1155
         );
         
@@ -576,6 +597,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
         vm.stopPrank();
@@ -606,6 +628,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            LicenseVersion.PUBLIC,
             FractalLaunchpad.TokenType.ERC1155
         );
         vm.stopPrank();
@@ -639,6 +662,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
         
@@ -661,6 +685,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             _maxSupply,
             BASE_URI,
+            LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
         

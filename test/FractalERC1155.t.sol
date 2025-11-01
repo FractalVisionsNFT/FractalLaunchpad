@@ -2,7 +2,8 @@
 pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
-import {FractalERC1155Impl} from "../src/FractalERC1155.sol";
+import {LicenseVersion, FractalERC1155Impl} from "../src/FractalERC1155.sol";
+import {ICantBeEvil} from "@a16z/contracts/licenses/ICantBeEvil.sol";
 
 contract FractalERC1155Test is Test {
     FractalERC1155Impl public nft;
@@ -21,6 +22,7 @@ contract FractalERC1155Test is Test {
     event TransferSingle(address indexed operator, address indexed from, address indexed to, uint256 id, uint256 value);
     event TransferBatch(address indexed operator, address indexed from, address indexed to, uint256[] ids, uint256[] values);
     event URI(string value, uint256 indexed id);
+    event LicenseVersionSet(LicenseVersion indexed licenseVersion);
     
     function setUp() public {
         owner = makeAddr("owner");
@@ -32,8 +34,8 @@ contract FractalERC1155Test is Test {
         // Deploy the implementation
         nft = new FractalERC1155Impl();
         
-        // Initialize with owner
-        nft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner);
+        nft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.COMMERCIAL);
+
     }
     
     // ============ Initialization Tests ============
@@ -49,7 +51,7 @@ contract FractalERC1155Test is Test {
     
     function test_Initialize_ZeroMaxSupply() public {
         FractalERC1155Impl newNft = new FractalERC1155Impl();
-        newNft.initialize(NAME, SYMBOL, 0, BASE_URI, owner);
+        newNft.initialize(NAME, SYMBOL, 0, BASE_URI, owner, LicenseVersion.PUBLIC);
         
         assertEq(newNft.maxSupply(0), 0);
         // Should allow infinite minting when max supply is 0
@@ -57,7 +59,7 @@ contract FractalERC1155Test is Test {
     
     function test_Initialize_CannotReinitialize() public {
         vm.expectRevert();
-        nft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner);
+        nft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.COMMERCIAL);
     }
     
     function test_Initialize_OnlyTokenZeroHasMaxSupply() public {
@@ -806,5 +808,418 @@ contract FractalERC1155Test is Test {
         assertEq(nft.uri(1), uri3);
         
         vm.stopPrank();
+    }
+    
+    // ============ CantBeEvil (a16z) License Integration Tests ============
+    
+    function test_CantBeEvil_InitializeWithDifferentLicenses() public {
+        // Test all license types
+        LicenseVersion[6] memory licenses = [
+            LicenseVersion.PUBLIC,
+            LicenseVersion.EXCLUSIVE,
+            LicenseVersion.COMMERCIAL,
+            LicenseVersion.COMMERCIAL_NO_HATE,
+            LicenseVersion.PERSONAL,
+            LicenseVersion.PERSONAL_NO_HATE
+        ];
+        
+        string[6] memory expectedNames = [
+            "PUBLIC",
+            "EXCLUSIVE", 
+            "COMMERCIAL",
+            "COMMERCIAL_NO_HATE",
+            "PERSONAL",
+            "PERSONAL_NO_HATE"
+        ];
+        
+        for (uint256 i = 0; i < licenses.length; i++) {
+            FractalERC1155Impl testNft = new FractalERC1155Impl();
+            testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, licenses[i]);
+            
+            assertEq(testNft.getLicenseName(), expectedNames[i]);
+            
+            // Check license URI format
+            string memory expectedBaseURI = "ar://zmc1WTspIhFyVY82bwfAIcIExLFH5lUcHHUN0wXg4W8/";
+            string memory expectedLicenseURI = string.concat(expectedBaseURI, vm.toString(uint256(licenses[i])));
+            assertEq(testNft.getLicenseURI(), expectedLicenseURI);
+        }
+    }
+    
+    function test_CantBeEvil_GetLicenseURI_AllVersions() public {
+        string memory baseURI = "ar://zmc1WTspIhFyVY82bwfAIcIExLFH5lUcHHUN0wXg4W8/";
+        
+        // Test PUBLIC (0)
+        FractalERC1155Impl publicNft = new FractalERC1155Impl();
+        publicNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.PUBLIC);
+        assertEq(publicNft.getLicenseURI(), string.concat(baseURI, "0"));
+        
+        // Test EXCLUSIVE (1)
+        FractalERC1155Impl exclusiveNft = new FractalERC1155Impl();
+        exclusiveNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.EXCLUSIVE);
+        assertEq(exclusiveNft.getLicenseURI(), string.concat(baseURI, "1"));
+        
+        // Test COMMERCIAL (2)
+        FractalERC1155Impl commercialNft = new FractalERC1155Impl();
+        commercialNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.COMMERCIAL);
+        assertEq(commercialNft.getLicenseURI(), string.concat(baseURI, "2"));
+        
+        // Test COMMERCIAL_NO_HATE (3)
+        FractalERC1155Impl commercialNoHateNft = new FractalERC1155Impl();
+        commercialNoHateNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.COMMERCIAL_NO_HATE);
+        assertEq(commercialNoHateNft.getLicenseURI(), string.concat(baseURI, "3"));
+        
+        // Test PERSONAL (4)
+        FractalERC1155Impl personalNft = new FractalERC1155Impl();
+        personalNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.PERSONAL);
+        assertEq(personalNft.getLicenseURI(), string.concat(baseURI, "4"));
+        
+        // Test PERSONAL_NO_HATE (5)
+        FractalERC1155Impl personalNoHateNft = new FractalERC1155Impl();
+        personalNoHateNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.PERSONAL_NO_HATE);
+        assertEq(personalNoHateNft.getLicenseURI(), string.concat(baseURI, "5"));
+    }
+    
+    function test_CantBeEvil_GetLicenseName_AllVersions() public {
+        // Test each license version returns correct name
+        FractalERC1155Impl testNft;
+        
+        testNft = new FractalERC1155Impl();
+        testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.PUBLIC);
+        assertEq(testNft.getLicenseName(), "PUBLIC");
+        
+        testNft = new FractalERC1155Impl();
+        testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.EXCLUSIVE);
+        assertEq(testNft.getLicenseName(), "EXCLUSIVE");
+        
+        testNft = new FractalERC1155Impl();
+        testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.COMMERCIAL);
+        assertEq(testNft.getLicenseName(), "COMMERCIAL");
+        
+        testNft = new FractalERC1155Impl();
+        testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.COMMERCIAL_NO_HATE);
+        assertEq(testNft.getLicenseName(), "COMMERCIAL_NO_HATE");
+        
+        testNft = new FractalERC1155Impl();
+        testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.PERSONAL);
+        assertEq(testNft.getLicenseName(), "PERSONAL");
+        
+        testNft = new FractalERC1155Impl();
+        testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.PERSONAL_NO_HATE);
+        assertEq(testNft.getLicenseName(), "PERSONAL_NO_HATE");
+    }
+    
+    function test_CantBeEvil_SupportsInterface() public {
+        // Test that contract supports ICantBeEvil interface
+        bytes4 cantBeEvilInterfaceId = type(ICantBeEvil).interfaceId;
+        assertTrue(nft.supportsInterface(cantBeEvilInterfaceId));
+        
+        // Test that it still supports ERC1155 interface
+        bytes4 erc1155InterfaceId = 0xd9b67a26;
+        assertTrue(nft.supportsInterface(erc1155InterfaceId));
+        
+        // Test that it still supports ERC165 interface
+        bytes4 erc165InterfaceId = 0x01ffc9a7;
+        assertTrue(nft.supportsInterface(erc165InterfaceId));
+        
+        // Test that it doesn't support a random interface
+        bytes4 randomInterfaceId = 0xffffffff;
+        assertFalse(nft.supportsInterface(randomInterfaceId));
+    }
+    
+    function test_CantBeEvil_LicenseVersionSetEvent() public {
+        // Test that LicenseVersionSet event is emitted during initialization
+        FractalERC1155Impl testNft = new FractalERC1155Impl();
+        
+        vm.expectEmit(true, true, true, true);
+        emit LicenseVersionSet(LicenseVersion.COMMERCIAL);
+        
+        testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.COMMERCIAL);
+    }
+    
+    function test_CantBeEvil_LicenseIntegrationWithERC1155Operations() public {
+        // Test that license functionality works alongside normal ERC1155 operations
+        vm.startPrank(owner);
+        
+        // Mint tokens
+        nft.mint(user1, 0, 100, "");
+        nft.mint(user1, 1, 200, "");
+        assertEq(nft.balanceOf(user1, 0), 100);
+        assertEq(nft.balanceOf(user1, 1), 200);
+        
+        // License functions should still work
+        assertEq(nft.getLicenseName(), "COMMERCIAL");
+        assertEq(nft.getLicenseURI(), "ar://zmc1WTspIhFyVY82bwfAIcIExLFH5lUcHHUN0wXg4W8/2");
+        
+        // Batch mint
+        uint256[] memory ids = new uint256[](2);
+        uint256[] memory amounts = new uint256[](2);
+        ids[0] = 2;
+        ids[1] = 3;
+        amounts[0] = 50;
+        amounts[1] = 75;
+        
+        nft.batchMint(user1, ids, amounts, "");
+        assertEq(nft.balanceOf(user1, 2), 50);
+        assertEq(nft.balanceOf(user1, 3), 75);
+        
+        // License should remain the same
+        assertEq(nft.getLicenseName(), "COMMERCIAL");
+        
+        vm.stopPrank();
+        
+        // Transfer tokens
+        vm.startPrank(user1);
+        nft.safeTransferFrom(user1, user2, 0, 25, "");
+        assertEq(nft.balanceOf(user1, 0), 75);
+        assertEq(nft.balanceOf(user2, 0), 25);
+        
+        // License should still be accessible
+        assertEq(nft.getLicenseName(), "COMMERCIAL");
+        
+        // Burn tokens
+        nft.burn(user1, 1, 50);
+        assertEq(nft.balanceOf(user1, 1), 150);
+        assertEq(nft.totalSupply(1), 150);
+        
+        // License should still be accessible
+        assertEq(nft.getLicenseName(), "COMMERCIAL");
+        
+        vm.stopPrank();
+    }
+    
+    function test_CantBeEvil_LicenseImmutable() public {
+        // License should be set during initialization and cannot be changed
+        assertEq(nft.getLicenseName(), "COMMERCIAL");
+        
+        // There should be no function to change the license after initialization
+        // This is enforced by the CantBeEvil contract design
+        
+        // Mint, transfer, and burn operations shouldn't affect license
+        vm.startPrank(owner);
+        nft.mint(user1, 0, 100, "");
+        vm.stopPrank();
+        
+        vm.startPrank(user1);
+        nft.safeTransferFrom(user1, user2, 0, 50, "");
+        nft.burn(user1, 0, 25);
+        vm.stopPrank();
+        
+        assertEq(nft.getLicenseName(), "COMMERCIAL");
+    }
+    
+    function test_CantBeEvil_MultipleLicenseTypesWorkflow() public {
+        // Create ERC1155 contracts with different license types and test they work independently
+        FractalERC1155Impl publicNft = new FractalERC1155Impl();
+        FractalERC1155Impl personalNft = new FractalERC1155Impl();
+        FractalERC1155Impl exclusiveNft = new FractalERC1155Impl();
+        
+        publicNft.initialize("Public 1155", "PUB1155", 1000, BASE_URI, owner, LicenseVersion.PUBLIC);
+        personalNft.initialize("Personal 1155", "PERS1155", 500, BASE_URI, owner, LicenseVersion.PERSONAL);
+        exclusiveNft.initialize("Exclusive 1155", "EXC1155", 100, BASE_URI, owner, LicenseVersion.EXCLUSIVE);
+        
+        // Verify each has correct license
+        assertEq(publicNft.getLicenseName(), "PUBLIC");
+        assertEq(personalNft.getLicenseName(), "PERSONAL");
+        assertEq(exclusiveNft.getLicenseName(), "EXCLUSIVE");
+        
+        // Test minting on each
+        vm.startPrank(owner);
+        publicNft.mint(user1, 0, 100, "");
+        personalNft.mint(user1, 0, 200, "");
+        exclusiveNft.mint(user1, 0, 50, "");
+        vm.stopPrank();
+        
+        // Verify balances
+        assertEq(publicNft.balanceOf(user1, 0), 100);
+        assertEq(personalNft.balanceOf(user1, 0), 200);
+        assertEq(exclusiveNft.balanceOf(user1, 0), 50);
+        
+        // Verify licenses remain unchanged
+        assertEq(publicNft.getLicenseName(), "PUBLIC");
+        assertEq(personalNft.getLicenseName(), "PERSONAL");
+        assertEq(exclusiveNft.getLicenseName(), "EXCLUSIVE");
+    }
+    
+    function test_CantBeEvil_LicenseWithMultipleTokenTypes() public {
+        // Test that license applies to all token types in the contract
+        vm.startPrank(owner);
+        
+        // Mint different token types
+        nft.mint(user1, 0, 100, "");
+        nft.mint(user1, 1, 200, "");
+        nft.mint(user1, 999, 50, "");
+        
+        // Set different max supplies and URIs for different token types
+        nft.setMaxSupply(1, 500);
+        nft.setMaxSupply(999, 100);
+        nft.setTokenURI(1, "https://custom1.com/");
+        nft.setTokenURI(999, "https://custom999.com/");
+        
+        vm.stopPrank();
+        
+        // License should be the same for all token types
+        assertEq(nft.getLicenseName(), "COMMERCIAL");
+        assertEq(nft.getLicenseURI(), "ar://zmc1WTspIhFyVY82bwfAIcIExLFH5lUcHHUN0wXg4W8/2");
+        
+        // Different token URIs don't affect license
+        assertEq(nft.uri(1), "https://custom1.com/");
+        assertEq(nft.uri(999), "https://custom999.com/");
+        assertEq(nft.getLicenseName(), "COMMERCIAL");
+    }
+    
+    function test_CantBeEvil_LicenseWithBatchOperations() public {
+        // Test license functionality with batch operations
+        vm.startPrank(owner);
+        
+        uint256[] memory ids = new uint256[](5);
+        uint256[] memory amounts = new uint256[](5);
+        
+        for (uint256 i = 0; i < 5; i++) {
+            ids[i] = i;
+            amounts[i] = 100 * (i + 1);
+        }
+        
+        // Batch mint
+        nft.batchMint(user1, ids, amounts, "");
+        
+        // Verify mints
+        for (uint256 i = 0; i < 5; i++) {
+            assertEq(nft.balanceOf(user1, i), 100 * (i + 1));
+        }
+        
+        // License should remain unchanged
+        assertEq(nft.getLicenseName(), "COMMERCIAL");
+        
+        vm.stopPrank();
+        
+        // Batch transfer
+        vm.startPrank(user1);
+        uint256[] memory transferAmounts = new uint256[](5);
+        for (uint256 i = 0; i < 5; i++) {
+            transferAmounts[i] = 50;
+        }
+        
+        nft.safeBatchTransferFrom(user1, user2, ids, transferAmounts, "");
+        
+        // Verify transfers
+        for (uint256 i = 0; i < 5; i++) {
+            assertEq(nft.balanceOf(user2, i), 50);
+        }
+        
+        // License should remain unchanged
+        assertEq(nft.getLicenseName(), "COMMERCIAL");
+        
+        // Batch burn
+        uint256[] memory burnAmounts = new uint256[](5);
+        for (uint256 i = 0; i < 5; i++) {
+            burnAmounts[i] = 25;
+        }
+        
+        nft.burnBatch(user1, ids, burnAmounts);
+        
+        // License should still be accessible
+        assertEq(nft.getLicenseName(), "COMMERCIAL");
+        
+        vm.stopPrank();
+    }
+    
+    // ============ Fuzz Tests for CantBeEvil ============
+    
+    function testFuzz_CantBeEvil_LicenseVersionBounds(uint8 licenseVersionRaw) public {
+        vm.assume(licenseVersionRaw <= 5); // Valid license versions are 0-5
+        
+        LicenseVersion licenseVersion = LicenseVersion(licenseVersionRaw);
+        FractalERC1155Impl testNft = new FractalERC1155Impl();
+        
+        testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, licenseVersion);
+        
+        // Should not revert and should return valid license data
+        string memory licenseName = testNft.getLicenseName();
+        string memory licenseURI = testNft.getLicenseURI();
+        
+        // License name should not be empty
+        assertTrue(bytes(licenseName).length > 0);
+        
+        // License URI should contain the base URI
+        string memory baseURI = "ar://zmc1WTspIhFyVY82bwfAIcIExLFH5lUcHHUN0wXg4W8/";
+        assertTrue(bytes(licenseURI).length > bytes(baseURI).length);
+        
+        // Should support ICantBeEvil interface
+        assertTrue(testNft.supportsInterface(type(ICantBeEvil).interfaceId));
+    }
+    
+    function testFuzz_CantBeEvil_LicenseWithRandomTokenOperations(
+        uint256 tokenId,
+        uint256 amount,
+        uint8 licenseVersionRaw
+    ) public {
+        vm.assume(licenseVersionRaw <= 5);
+        vm.assume(amount > 0 && amount <= 1000000);
+        vm.assume(tokenId <= type(uint128).max); // Reasonable token ID range
+        
+        LicenseVersion licenseVersion = LicenseVersion(licenseVersionRaw);
+        FractalERC1155Impl testNft = new FractalERC1155Impl();
+        
+        testNft.initialize(NAME, SYMBOL, 0, BASE_URI, owner, licenseVersion); // 0 max supply for unlimited
+        
+        // Store original license info
+        string memory originalLicenseName = testNft.getLicenseName();
+        string memory originalLicenseURI = testNft.getLicenseURI();
+        
+        // Perform random operations
+        vm.startPrank(owner);
+        testNft.mint(user1, tokenId, amount, "");
+        vm.stopPrank();
+        
+        // License should remain unchanged
+        assertEq(testNft.getLicenseName(), originalLicenseName);
+        assertEq(testNft.getLicenseURI(), originalLicenseURI);
+        
+        // Transfer some tokens
+        vm.startPrank(user1);
+        uint256 transferAmount = amount / 2;
+        if (transferAmount > 0) {
+            testNft.safeTransferFrom(user1, user2, tokenId, transferAmount, "");
+        }
+        vm.stopPrank();
+        
+        // License should still be unchanged
+        assertEq(testNft.getLicenseName(), originalLicenseName);
+        assertEq(testNft.getLicenseURI(), originalLicenseURI);
+        
+        // Should still support ICantBeEvil interface
+        assertTrue(testNft.supportsInterface(type(ICantBeEvil).interfaceId));
+    }
+    
+    // ============ Edge Cases for CantBeEvil ============
+    
+    function test_CantBeEvil_EdgeCase_EmptyStringHandling() public {
+        // Test that license functions handle edge cases properly
+        string memory licenseName = nft.getLicenseName();
+        string memory licenseURI = nft.getLicenseURI();
+        
+        // Neither should be empty
+        assertTrue(bytes(licenseName).length > 0);
+        assertTrue(bytes(licenseURI).length > 0);
+        
+        // Should be valid strings
+        assertEq(licenseName, "COMMERCIAL");
+        assertTrue(bytes(licenseURI).length > 10); // Reasonable minimum length
+    }
+    
+    function test_CantBeEvil_EdgeCase_InterfaceIdStability() public {
+        // Test that interface IDs are stable across different instances
+        FractalERC1155Impl nft1 = new FractalERC1155Impl();
+        FractalERC1155Impl nft2 = new FractalERC1155Impl();
+        
+        nft1.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.PUBLIC);
+        nft2.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.EXCLUSIVE);
+        
+        bytes4 interfaceId = type(ICantBeEvil).interfaceId;
+        
+        // Both should support the same interface ID
+        assertTrue(nft1.supportsInterface(interfaceId));
+        assertTrue(nft2.supportsInterface(interfaceId));
+        assertTrue(nft.supportsInterface(interfaceId));
     }
 }

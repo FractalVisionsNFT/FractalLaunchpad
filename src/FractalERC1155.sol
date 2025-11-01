@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ERC1155Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "./a16z/CantBeEvilUpgradeable.sol";
 
-contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable {
+contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable, UUPSUpgradeable, CantBeEvilUpgradeable {
 
     // Custom errors
     error MaxSupplyExceeded();
@@ -20,20 +21,37 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable {
     mapping(uint256 => uint256) public maxSupply;
     mapping(uint256 => string) public tokenURIs;
 
+    event MaxSupplySet(uint256 indexed tokenId, uint256 maxSupply);
+    event TokenURISet(uint256 indexed tokenId, string tokenURI);
+    event LicenseVersionSet(LicenseVersion indexed licenseVersion);
+
     // note: maxSupply is only set for token ID 0 during initialization, for other IDs it can be set later using the setMaxSupply function
+   /**
+     * @dev Initializes the contract
+     * @param _name Token collection name
+     * @param _symbol Token collection symbol
+     * @param _maxSupply Max supply for token ID 0 (0 for unlimited)
+     * @param _baseURI Base URI for token metadata
+     * @param _owner Contract owner address
+     * @param _licenseVersion License type for NFT usage rights
+     */
     function initialize(
         string memory _name,    
         string memory _symbol,
         uint256 _maxSupply,
         string memory _baseURI,
-        address _owner
+        address _owner,
+        LicenseVersion _licenseVersion
     ) public initializer {
         __ERC1155_init(_baseURI);
         __Ownable_init(_owner);
+        __CantBeEvil_init(_licenseVersion);
+        __UUPSUpgradeable_init();
         name = _name;
         symbol = _symbol;
         maxSupply[0] = _maxSupply;
-
+        
+        emit LicenseVersionSet(_licenseVersion);
     }
     
     function mint(
@@ -70,10 +88,14 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable {
     function setMaxSupply(uint256 _id, uint256 _maxSupply) external onlyOwner {
         if (_maxSupply < totalSupply[_id]) revert MaxSupplyBelowCurrentSupply();
         maxSupply[_id] = _maxSupply;
+
+         emit MaxSupplySet(_id, _maxSupply);
     }
     
     function setTokenURI(uint256 _id, string memory _tokenURI) external onlyOwner {
         tokenURIs[_id] = _tokenURI;
+
+        emit TokenURISet(_id, _tokenURI);
     }
     
     function uri(uint256 _id) public view override returns (string memory) {
@@ -100,4 +122,22 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable {
 
         super._burnBatch(_from, _ids, _amounts);
     }
+
+    /**
+     * @dev Override supportsInterface to include all parent contracts
+     */
+    function supportsInterface(bytes4 interfaceId) 
+        public 
+        view 
+        virtual 
+        override(ERC1155Upgradeable, CantBeEvilUpgradeable) 
+        returns (bool) 
+    {
+        return super.supportsInterface(interfaceId);
+    }
+
+    /**
+     * @dev UUPS Upgrade authorization - only owner can upgrade
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

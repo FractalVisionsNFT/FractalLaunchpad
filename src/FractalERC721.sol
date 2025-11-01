@@ -1,36 +1,42 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {ERC721Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "./a16z/CantBeEvilUpgradeable.sol";
+contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable, CantBeEvilUpgradeable {
 
-
-// Upgradeable ERC721 implementation for cloning
-contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable {
-
-    // Custom errors
     error MaxSupplyBelowCurrentSupply();
     error MaxSupplyExceeded();
     error NotAuthorized();
 
-
-    // State Variables
     uint256 public totalSupply;
     uint256 public maxSupply;
     string public baseTokenURI;
+
+
+    event MaxSupplySet(uint256 maxSupply);
+    event BaseURISet(string baseURI);
+    event LicenseVersionSet(LicenseVersion indexed licenseVersion);
+    
     
     function initialize(
         string memory _name,
         string memory _symbol,
         uint256 _maxSupply,
         string memory _baseURI,
-        address _owner
+        address _owner,
+        LicenseVersion _licenseVersion  
     ) public initializer {
         __ERC721_init(_name, _symbol);
         __Ownable_init(_owner);
+        __CantBeEvil_init(_licenseVersion); 
+        __UUPSUpgradeable_init();
         maxSupply = _maxSupply;
         baseTokenURI = _baseURI;
+
+        emit LicenseVersionSet(_licenseVersion);
     }
     
     function mint(address _to, uint256 _tokenId) external onlyOwner {
@@ -50,10 +56,13 @@ contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable {
     function setMaxSupply(uint256 _maxSupply) external onlyOwner {
         if (_maxSupply < totalSupply) revert MaxSupplyBelowCurrentSupply();
         maxSupply = _maxSupply;
+
+        emit MaxSupplySet(_maxSupply);
     }
     
     function setBaseURI(string calldata _baseURI) external onlyOwner {
         baseTokenURI = _baseURI;
+        emit BaseURISet(_baseURI);
     }
     
     function _baseURI() internal view override returns (string memory) {
@@ -65,6 +74,21 @@ contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable {
         totalSupply--;  
         _burn(_tokenId);
     }
+
+
+    // Override supportsInterface to combine all parent implementations
+    function supportsInterface(bytes4 interfaceId) 
+        public 
+        view 
+        virtual 
+        override(ERC721Upgradeable, CantBeEvilUpgradeable) 
+        returns (bool) 
+    {
+        return super.supportsInterface(interfaceId);
+    }
+
+    // UUPS Upgrade authorization - only owner can upgrade
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
 
 }

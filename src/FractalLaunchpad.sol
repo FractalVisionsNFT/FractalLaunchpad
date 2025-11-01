@@ -4,10 +4,10 @@ pragma solidity ^0.8.24;
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {MinimalProxy} from "./Factory.sol";
 import {FractalERC721Impl} from "./FractalERC721.sol";
-import {FractalERC1155Impl} from "./FractalERC1155.sol";
+import {LicenseVersion, FractalERC1155Impl} from "./FractalERC1155.sol";
+
 
 contract FractalLaunchpad is Ownable {
 
@@ -17,6 +17,7 @@ contract FractalLaunchpad is Ownable {
         address creator;
         uint256 maxSupply;
         string baseURI;
+        LicenseVersion licenseVersion;
     }
 
     enum TokenType { ERC721, ERC1155 }
@@ -54,7 +55,7 @@ contract FractalLaunchpad is Ownable {
         address indexed creator
     );
 
-    constructor(address _feeRecipient,uint256 _fee, address _erc1155, address _erc721, address _factory) Ownable(msg.sender) {
+    constructor(address _feeRecipient,uint256 _fee, address _erc1155, address _erc721, address _factory ) Ownable(msg.sender) {
         if (_feeRecipient == address(0)) revert InvalidFeeRecipient();
         if (_erc1155 == address(0)) revert InvalidERC1155Implementation();
         if (_erc721 == address(0)) revert InvalidERC721Implementation();
@@ -72,6 +73,7 @@ contract FractalLaunchpad is Ownable {
         string memory _symbol,
         uint256 _maxSupply,
         string memory _baseURI,
+        LicenseVersion _licenseVersion,
         TokenType _tokenType
     ) external payable returns (uint256 launchId) {
         // if (_maxSupply == 0) revert MaxSupplyMustBeGreaterThanZero();
@@ -86,14 +88,15 @@ contract FractalLaunchpad is Ownable {
         }
 
         if(_tokenType == TokenType.ERC721) {
-            address tokenContract = nftFactory.createClone(ERC721_IMPLEMENTATION, _name, _symbol, _maxSupply, _baseURI, msg.sender);
+            address tokenContract = nftFactory.createClone(ERC721_IMPLEMENTATION, _name, _symbol, _maxSupply, _baseURI, msg.sender, _licenseVersion);
 
             launches[launchId] = LaunchConfig({
                 tokenType: TokenType.ERC721,
                 tokenContract: tokenContract,
                 creator: msg.sender,
                 maxSupply: _maxSupply,
-                baseURI: _baseURI
+                baseURI: _baseURI,
+                licenseVersion: _licenseVersion
             });
 
             creatorToERC721s[msg.sender].push(tokenContract);
@@ -101,13 +104,14 @@ contract FractalLaunchpad is Ownable {
 
             emit LaunchCreated(launchId, TokenType.ERC721, tokenContract, msg.sender);
         } else {
-            address tokenContract = nftFactory.createClone(ERC1155_IMPLEMENTATION, _name, _symbol, _maxSupply, _baseURI, msg.sender);
+            address tokenContract = nftFactory.createClone(ERC1155_IMPLEMENTATION, _name, _symbol, _maxSupply, _baseURI, msg.sender, _licenseVersion);
             launches[launchId] = LaunchConfig({
                 tokenType: TokenType.ERC1155,
                 tokenContract: tokenContract,
                 creator: msg.sender,
                 maxSupply: _maxSupply,
-                baseURI: _baseURI
+                baseURI: _baseURI,
+                licenseVersion: _licenseVersion
             });
 
             creatorToERC1155s[msg.sender].push(tokenContract);
