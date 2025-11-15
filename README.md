@@ -48,9 +48,8 @@ Foundry consists of:
 ## Documentation
 
 - **Foundry**: https://book.getfoundry.sh/
-- **Architecture**: See [ARCHITECTURE.md](./ARCHITECTURE.md)
-- **CantBeEvil Tests**: See [CANTBEEVIL_TESTS.md](./CANTBEEVIL_TESTS.md)
-- **Upgradeability Tests**: See [UPGRADEABILITY_TESTS.md](./UPGRADEABILITY_TESTS.md)
+- **Architecture**: See [ARCHITECTURE.md](README.md)
+- **A16z**: See [A16z.md](./lib/a16z-contracts/README.md)
 
 ## Usage
 
@@ -141,10 +140,7 @@ FractalLaunchpad/
 │   ├── a16z-contracts/
 │   └── forge-std/
 ├── foundry.toml                     # Foundry configuration
-├── remappings.txt                   # Import remappings
-├── ARCHITECTURE.md                  # System architecture documentation
-├── CANTBEEVIL_TESTS.md             # CantBeEvil integration test docs
-└── UPGRADEABILITY_TESTS.md         # Upgradeability test docs
+└── remappings.txt                   # Import remappings
 ```
 
 ## Features
