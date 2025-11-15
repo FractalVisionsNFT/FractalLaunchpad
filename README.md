@@ -14,9 +14,8 @@ FractalLaunchpad provides a robust, scalable platform for launching NFT collecti
 
 ## Architecture
 
-For a detailed view of the system architecture, please refer to [ARCHITECTURE.md](./ARCHITECTURE.md).
-
 The architecture diagram illustrates the complete system design:
+![ARCHITECTURE](Lauchpad-architecture.png)
 
 ```
 System Components:
@@ -203,8 +202,11 @@ $ forge test
 - **Access Control**: Owner-based authorization for sensitive operations
 - **Upgrade Authorization**: Only owner can authorize implementation upgrades
 - **State Preservation**: UUPS pattern ensures no storage collisions during upgrades
-- **Input Validation**: Comprehensive parameter checking
 - **ERC165 Support**: Standard interface detection for license compatibility
+
+## Aknowledged Issue (Audit):
+- Overpayments during Launch are not refunded. Our UI is designed to prevent this by guiding users to pay the accurate fee.
+-  For ERC1155, maxSupply is only set for token ID 0 during initialization, for other IDs, it can be set later using the setMaxSupply function
 
 ## License
 
