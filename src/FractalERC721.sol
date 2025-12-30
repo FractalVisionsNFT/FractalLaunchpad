@@ -4,8 +4,10 @@ pragma solidity ^0.8.24;
 import {ERC721Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/token/common/ERC2981.sol";
+
 import "./a16z/CantBeEvilUpgradeable.sol";
-contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable, CantBeEvilUpgradeable {
+contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable, CantBeEvilUpgradeable, ERC2981 {
 
     error MaxSupplyBelowCurrentSupply();
     error MaxSupplyExceeded();
@@ -27,12 +29,14 @@ contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
         uint256 _maxSupply,
         string memory _baseURI,
         address _owner,
+        uint96 _royaltyFee,  //500 = 5%
         LicenseVersion _licenseVersion  
     ) public initializer {
         __ERC721_init(_name, _symbol);
         __Ownable_init(_owner);
         __CantBeEvil_init(_licenseVersion); 
         __UUPSUpgradeable_init();
+        _setDefaultRoyalty(_owner, _royaltyFee);
         maxSupply = _maxSupply;
         baseTokenURI = _baseURI;
 
@@ -42,14 +46,14 @@ contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
     function mint(address _to, uint256 _tokenId) external onlyOwner {
         if(maxSupply !=0 && totalSupply >= maxSupply) revert MaxSupplyExceeded();   
         totalSupply++;
-        _mint(_to, _tokenId);
+        _safeMint(_to, _tokenId);
     }
     
     function batchMint(address _to, uint256[] calldata _tokenIds) external onlyOwner {
         if (maxSupply !=0 && totalSupply + _tokenIds.length > maxSupply) revert MaxSupplyExceeded();
         for (uint256 i = 0; i < _tokenIds.length; i++) {
             totalSupply++;
-            _mint(_to, _tokenIds[i]);
+            _safeMint(_to, _tokenIds[i]);
         }
     }
 
@@ -81,7 +85,7 @@ contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
         public 
         view 
         virtual 
-        override(ERC721Upgradeable, CantBeEvilUpgradeable) 
+        override(ERC721Upgradeable, CantBeEvilUpgradeable, ERC2981) 
         returns (bool) 
     {
         return super.supportsInterface(interfaceId);
