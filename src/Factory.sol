@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 import {LicenseVersion} from "./a16z/CantBeEvilUpgradeable.sol";
 
 interface IFractalLaunchpad {
-    function initialize(string memory _name, string memory _symbol, uint256 _maxSupply, string memory _baseURI, address _owner, LicenseVersion _licenseVersion) external;
+    function initialize(string memory _name, string memory _symbol, uint256 _maxSupply, string memory _baseURI, address _owner, uint96 _royaltyFee, LicenseVersion _licenseVersion) external;
 }
 
 contract MinimalProxy {
@@ -24,10 +24,12 @@ contract MinimalProxy {
      * @param _maxSupply The maximum supply of the token.
      * @param _baseURI The base URI for the token metadata.
      * @param _owner The owner of the cloned contract.
+     * @param _royaltyFee The royalty fee in basis points (500 = 5%).
+     * @param _licenseVersion The license version for the token.
      */
     function createClone(
         address _implementationContract,
-        string memory _name, string memory _symbol, uint256 _maxSupply, string memory _baseURI, address _owner, LicenseVersion _licenseVersion
+        string memory _name, string memory _symbol, uint256 _maxSupply, string memory _baseURI, address _owner, uint96 _royaltyFee, LicenseVersion _licenseVersion
     ) external returns (address) {
         
         if (_implementationContract == address(0)) revert InvalidImplementation();
@@ -95,7 +97,7 @@ contract MinimalProxy {
             // code size == 0x37 (55 bytes)
             proxy := create(0, clone, 0x37)
         }
-        IFractalLaunchpad(proxy).initialize( _name, _symbol, _maxSupply, _baseURI, _owner, _licenseVersion);
+        IFractalLaunchpad(proxy).initialize( _name, _symbol, _maxSupply, _baseURI, _owner, _royaltyFee, _licenseVersion);
 
 
         // Add the newly deployed contract address to the deployer's array

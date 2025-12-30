@@ -17,6 +17,7 @@ contract FractalLaunchpad is Ownable {
         address creator;
         uint256 maxSupply;
         string baseURI;
+        uint96 royaltyFee;
         LicenseVersion licenseVersion;
     }
 
@@ -73,6 +74,7 @@ contract FractalLaunchpad is Ownable {
         string memory _symbol,
         uint256 _maxSupply,
         string memory _baseURI,
+        uint96 _royaltyFee,
         LicenseVersion _licenseVersion,
         TokenType _tokenType
     ) external payable returns (uint256 launchId) {
@@ -88,7 +90,7 @@ contract FractalLaunchpad is Ownable {
         }
 
         if(_tokenType == TokenType.ERC721) {
-            address tokenContract = nftFactory.createClone(ERC721_IMPLEMENTATION, _name, _symbol, _maxSupply, _baseURI, msg.sender, _licenseVersion);
+            address tokenContract = nftFactory.createClone(ERC721_IMPLEMENTATION, _name, _symbol, _maxSupply, _baseURI, msg.sender, _royaltyFee, _licenseVersion);
 
             launches[launchId] = LaunchConfig({
                 tokenType: TokenType.ERC721,
@@ -96,6 +98,7 @@ contract FractalLaunchpad is Ownable {
                 creator: msg.sender,
                 maxSupply: _maxSupply,
                 baseURI: _baseURI,
+                royaltyFee: _royaltyFee,
                 licenseVersion: _licenseVersion
             });
 
@@ -104,13 +107,14 @@ contract FractalLaunchpad is Ownable {
 
             emit LaunchCreated(launchId, TokenType.ERC721, tokenContract, msg.sender);
         } else {
-            address tokenContract = nftFactory.createClone(ERC1155_IMPLEMENTATION, _name, _symbol, _maxSupply, _baseURI, msg.sender, _licenseVersion);
+            address tokenContract = nftFactory.createClone(ERC1155_IMPLEMENTATION, _name, _symbol, _maxSupply, _baseURI, msg.sender, _royaltyFee, _licenseVersion);
             launches[launchId] = LaunchConfig({
                 tokenType: TokenType.ERC1155,
                 tokenContract: tokenContract,
                 creator: msg.sender,
                 maxSupply: _maxSupply,
                 baseURI: _baseURI,
+                royaltyFee: _royaltyFee,
                 licenseVersion: _licenseVersion
             });
 

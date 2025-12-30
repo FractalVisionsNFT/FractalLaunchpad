@@ -4,9 +4,10 @@ pragma solidity ^0.8.24;
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ERC1155Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "./a16z/CantBeEvilUpgradeable.sol";
 
-contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable, UUPSUpgradeable, CantBeEvilUpgradeable {
+contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable, UUPSUpgradeable, CantBeEvilUpgradeable, ERC2981 {
 
     // Custom errors
     error MaxSupplyExceeded();
@@ -33,6 +34,7 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable, UUPSUpgra
      * @param _maxSupply Max supply for token ID 0 (0 for unlimited)
      * @param _baseURI Base URI for token metadata
      * @param _owner Contract owner address
+     * @param _royaltyFee Royalty fee in basis points (500 = 5%)
      * @param _licenseVersion License type for NFT usage rights
      */
     function initialize(
@@ -41,12 +43,14 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable, UUPSUpgra
         uint256 _maxSupply,
         string memory _baseURI,
         address _owner,
+        uint96 _royaltyFee,
         LicenseVersion _licenseVersion
     ) public initializer {
         __ERC1155_init(_baseURI);
         __Ownable_init(_owner);
         __CantBeEvil_init(_licenseVersion);
         __UUPSUpgradeable_init();
+        _setDefaultRoyalty(_owner, _royaltyFee);
         name = _name;
         symbol = _symbol;
         maxSupply[0] = _maxSupply;
@@ -130,7 +134,7 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable, UUPSUpgra
         public 
         view 
         virtual 
-        override(ERC1155Upgradeable, CantBeEvilUpgradeable) 
+        override(ERC1155Upgradeable, CantBeEvilUpgradeable, ERC2981) 
         returns (bool) 
     {
         return super.supportsInterface(interfaceId);

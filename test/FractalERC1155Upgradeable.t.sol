@@ -68,6 +68,7 @@ contract FractalERC1155UpgradeableTest is Test {
     string public constant SYMBOL = "U1155";
     uint256 public constant MAX_SUPPLY = 1000;
     string public constant BASE_URI = "https://upgradeable1155.com/{id}";
+    uint96 public constant ROYALTY_FEE = 500; // 5%
     
     event TransferSingle(address indexed operator, address indexed from, address indexed to, uint256 id, uint256 value);
     event TransferBatch(address indexed operator, address indexed from, address indexed to, uint256[] ids, uint256[] values);
@@ -143,7 +144,7 @@ contract FractalERC1155UpgradeableTest is Test {
     function test_ProxyDeployment_CannotReinitialize() public {
         // Proxy should not be re-initializable
         vm.expectRevert();
-        proxy.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.PUBLIC);
+        proxy.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PUBLIC);
     }
     
     function test_ProxyDeployment_WithDifferentLicenses() public {

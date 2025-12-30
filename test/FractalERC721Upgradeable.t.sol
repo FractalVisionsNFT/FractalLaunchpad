@@ -52,6 +52,7 @@ contract FractalERC721UpgradeableTest is Test {
     string public constant SYMBOL = "UNFT";
     uint256 public constant MAX_SUPPLY = 1000;
     string public constant BASE_URI = "https://upgradeable.com/";
+    uint96 public constant ROYALTY_FEE = 500; // 5%
     
     event Upgraded(address indexed implementation);
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
@@ -124,7 +125,7 @@ contract FractalERC721UpgradeableTest is Test {
     function test_ProxyDeployment_CannotReinitialize() public {
         // Proxy should not be re-initializable
         vm.expectRevert();
-        proxy.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, LicenseVersion.PUBLIC);
+        proxy.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PUBLIC);
     }
     
     function test_ProxyDeployment_WithDifferentLicenses() public {

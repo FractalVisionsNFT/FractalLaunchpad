@@ -21,6 +21,7 @@ contract FractalLaunchpadTest is Test {
     
     uint256 public constant PLATFORM_FEE = 0.01 ether;
     uint256 public constant MAX_SUPPLY = 1000;
+    uint96 public constant ROYALTY_FEE = 500; // 5%
     string public constant NAME = "Test NFT";
     string public constant SYMBOL = "TNFT";
     string public constant BASE_URI = "https://test.com/";
@@ -131,6 +132,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
@@ -161,6 +163,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.PUBLIC,
             FractalLaunchpad.TokenType.ERC1155
         );
@@ -197,6 +200,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
@@ -218,6 +222,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
@@ -238,6 +243,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
@@ -254,6 +260,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             0, // Zero max supply for infinite minting
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
@@ -275,6 +282,7 @@ contract FractalLaunchpadTest is Test {
             "INFT",
             0, // Infinite minting
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
@@ -304,6 +312,7 @@ contract FractalLaunchpadTest is Test {
             "I1155",
             0, // Infinite minting
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.PUBLIC,
             FractalLaunchpad.TokenType.ERC1155
         );
@@ -331,6 +340,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
@@ -340,6 +350,7 @@ contract FractalLaunchpadTest is Test {
             "SNFT",
             500,
             "https://second.com/",
+            ROYALTY_FEE,
             LicenseVersion.PUBLIC,
             FractalLaunchpad.TokenType.ERC1155
         );
@@ -475,6 +486,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
@@ -500,6 +512,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
@@ -509,6 +522,7 @@ contract FractalLaunchpadTest is Test {
             "SNFT",
             500,
             "https://second.com/",
+            ROYALTY_FEE,
             LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
@@ -528,6 +542,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.PUBLIC,
             FractalLaunchpad.TokenType.ERC1155
         );
@@ -537,6 +552,7 @@ contract FractalLaunchpadTest is Test {
             "SNFT",
             500,
             "https://second.com/",
+            ROYALTY_FEE,
             LicenseVersion.PUBLIC,
             FractalLaunchpad.TokenType.ERC1155
         );
@@ -555,6 +571,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
@@ -575,6 +592,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.PUBLIC,
             FractalLaunchpad.TokenType.ERC1155
         );
@@ -597,6 +615,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
@@ -628,6 +647,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.PUBLIC,
             FractalLaunchpad.TokenType.ERC1155
         );
@@ -662,6 +682,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             MAX_SUPPLY,
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
@@ -685,6 +706,7 @@ contract FractalLaunchpadTest is Test {
             SYMBOL,
             _maxSupply,
             BASE_URI,
+            ROYALTY_FEE,
             LicenseVersion.COMMERCIAL,
             FractalLaunchpad.TokenType.ERC721
         );
