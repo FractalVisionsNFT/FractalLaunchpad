@@ -76,6 +76,7 @@ contract FractalERC721UpgradeableTest is Test {
             MAX_SUPPLY,
             BASE_URI,
             owner,
+            ROYALTY_FEE,
             LicenseVersion.COMMERCIAL
         );
         
@@ -146,6 +147,7 @@ contract FractalERC721UpgradeableTest is Test {
                 MAX_SUPPLY,
                 BASE_URI,
                 owner,
+                ROYALTY_FEE,
                 licenses[i]
             );
             
