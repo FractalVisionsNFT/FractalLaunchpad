@@ -127,11 +127,11 @@ FractalLaunchpad/
 │   └── a16z/
 │       └── CantBeEvilUpgradeable.sol # License integration
 ├── test/
-│   ├── FractalERC721.t.sol              # ERC721 core tests
-│   ├── FractalERC1155.t.sol             # ERC1155 core tests
+│   ├── FractalERC721.t.sol              # ERC721 core tests (57 tests)
+│   ├── FractalERC1155.t.sol             # ERC1155 core tests (77 tests)
 │   ├── FractalERC721Upgradeable.t.sol   # ERC721 upgrade tests (24 tests)
 │   ├── FractalERC1155Upgradeable.t.sol  # ERC1155 upgrade tests (23 tests)
-│   └── FractalLaunchad.t.sol            # Launchpad tests
+│   └── FractalLaunchad.t.sol            # Launchpad tests (34 tests)
 ├── script/
 │   └── FractalLauncpad.s.sol        # Deployment script
 ├── lib/                             # Dependencies
@@ -150,6 +150,7 @@ FractalLaunchpad/
 - Batch minting for gas efficiency
 - Customizable token URIs
 - Maximum supply enforcement
+- ERC2981 royalty standard support
 - CantBeEvil license integration
 
 ### ERC1155 Implementation
@@ -157,6 +158,7 @@ FractalLaunchpad/
 - Mint, burn, and batch operations
 - Per-token URI management
 - Maximum supply per token
+- ERC2981 royalty standard support
 - CantBeEvil license integration
 
 ### Launchpad Protocol
@@ -181,16 +183,22 @@ FractalLaunchpad/
 
 The project includes comprehensive test coverage:
 
-- **24 ERC721 Upgradeability Tests**: Testing upgrade scenarios, storage preservation, and state management
+### Test Breakdown by Suite:
+- **57 ERC721 Core Tests**: Standard operations, minting, burning, royalties, and licensing
+- **77 ERC1155 Core Tests**: Multi-token operations, batch minting, royalties, and licensing
+- **24 ERC721 Upgradeability Tests**: Upgrade scenarios, storage preservation, and state management
 - **23 ERC1155 Upgradeability Tests**: Multi-token upgrade testing and state consistency
-- **Core Functionality Tests**: Standard ERC721/ERC1155 operations
-- **CantBeEvil Integration Tests**: License system verification
-- **Edge Case Tests**: Boundary conditions and error handling
-- **Fuzz Testing**: Random input testing for robustness
+- **34 Launchpad Tests**: Platform deployment, fee management, and creator workflows
+
 
 Run all tests with:
 ```shell
 $ forge test
+```
+
+View test summary:
+```shell
+$ forge test --summary
 ```
 
 ## Security Considerations
@@ -198,7 +206,9 @@ $ forge test
 - **Access Control**: Owner-based authorization for sensitive operations
 - **Upgrade Authorization**: Only owner can authorize implementation upgrades
 - **State Preservation**: UUPS pattern ensures no storage collisions during upgrades
-- **ERC165 Support**: Standard interface detection for license compatibility
+- **Input Validation**: Comprehensive checks for max supply, token existence, and permissions
+- **Royalty Standard**: ERC2981 compliance for marketplace royalty enforcement
+- **ERC165 Support**: Standard interface detection for license and royalty compatibility
 
 ## Aknowledged Issue (Audit):
 - Overpayments during Launch are not refunded. Our UI is designed to prevent this by guiding users to pay the accurate fee.
