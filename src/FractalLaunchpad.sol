@@ -8,9 +8,7 @@ import {MinimalProxy} from "./Factory.sol";
 import {FractalERC721Impl} from "./FractalERC721.sol";
 import {LicenseVersion, FractalERC1155Impl} from "./FractalERC1155.sol";
 
-
 contract FractalLaunchpad is Ownable {
-
     struct LaunchConfig {
         TokenType tokenType;
         address tokenContract;
@@ -21,7 +19,10 @@ contract FractalLaunchpad is Ownable {
         LicenseVersion licenseVersion;
     }
 
-    enum TokenType { ERC721, ERC1155 }
+    enum TokenType {
+        ERC721,
+        ERC1155
+    }
 
     // Custom errors
     error InvalidFeeRecipient();
@@ -32,14 +33,13 @@ contract FractalLaunchpad is Ownable {
     error FailedToSendFee();
     error NoFundsToWithdraw();
     error FailedToWithdrawFunds();
-    
+
     address public immutable ERC721_IMPLEMENTATION;
     address public immutable ERC1155_IMPLEMENTATION;
     uint256 public platformFee;
     address public feeRecipient;
     uint256 public nextLaunchId;
-    MinimalProxy public immutable nftFactory; 
-
+    MinimalProxy public immutable nftFactory;
 
     mapping(address => address[]) public creatorToERC721s;
     mapping(address => address[]) public creatorToERC1155s;
@@ -48,15 +48,13 @@ contract FractalLaunchpad is Ownable {
     address[] public allERC721s;
     address[] public allERC1155s;
 
-
     event LaunchCreated(
-        uint256  launchId,
-        TokenType indexed tokenType,
-        address indexed tokenContract,
-        address indexed creator
+        uint256 launchId, TokenType indexed tokenType, address indexed tokenContract, address indexed creator
     );
 
-    constructor(address _feeRecipient,uint256 _fee, address _erc1155, address _erc721, address _factory ) Ownable(msg.sender) {
+    constructor(address _feeRecipient, uint256 _fee, address _erc1155, address _erc721, address _factory)
+        Ownable(msg.sender)
+    {
         if (_feeRecipient == address(0)) revert InvalidFeeRecipient();
         if (_erc1155 == address(0)) revert InvalidERC1155Implementation();
         if (_erc721 == address(0)) revert InvalidERC721Implementation();
@@ -68,7 +66,7 @@ contract FractalLaunchpad is Ownable {
         ERC1155_IMPLEMENTATION = _erc1155;
         ERC721_IMPLEMENTATION = _erc721;
     }
-    
+
     function createLaunch(
         string memory _name,
         string memory _symbol,
@@ -79,18 +77,20 @@ contract FractalLaunchpad is Ownable {
         TokenType _tokenType
     ) external payable returns (uint256 launchId) {
         // if (_maxSupply == 0) revert MaxSupplyMustBeGreaterThanZero();
-        
+
         launchId = nextLaunchId++;
 
-        if(!authorizedCreators[msg.sender] && msg.sender != owner()){
+        if (!authorizedCreators[msg.sender] && msg.sender != owner()) {
             //charge fee
             if (msg.value < platformFee) revert InsufficientFee();
-            (bool sent, ) = feeRecipient.call{value: platformFee}("");
+            (bool sent,) = feeRecipient.call{value: platformFee}("");
             if (!sent) revert FailedToSendFee();
         }
 
-        if(_tokenType == TokenType.ERC721) {
-            address tokenContract = nftFactory.createClone(ERC721_IMPLEMENTATION, _name, _symbol, _maxSupply, _baseURI, msg.sender, _royaltyFee, _licenseVersion);
+        if (_tokenType == TokenType.ERC721) {
+            address tokenContract = nftFactory.createClone(
+                ERC721_IMPLEMENTATION, _name, _symbol, _maxSupply, _baseURI, msg.sender, _royaltyFee, _licenseVersion
+            );
 
             launches[launchId] = LaunchConfig({
                 tokenType: TokenType.ERC721,
@@ -107,7 +107,9 @@ contract FractalLaunchpad is Ownable {
 
             emit LaunchCreated(launchId, TokenType.ERC721, tokenContract, msg.sender);
         } else {
-            address tokenContract = nftFactory.createClone(ERC1155_IMPLEMENTATION, _name, _symbol, _maxSupply, _baseURI, msg.sender, _royaltyFee, _licenseVersion);
+            address tokenContract = nftFactory.createClone(
+                ERC1155_IMPLEMENTATION, _name, _symbol, _maxSupply, _baseURI, msg.sender, _royaltyFee, _licenseVersion
+            );
             launches[launchId] = LaunchConfig({
                 tokenType: TokenType.ERC1155,
                 tokenContract: tokenContract,
@@ -122,29 +124,29 @@ contract FractalLaunchpad is Ownable {
             allERC1155s.push(tokenContract);
             emit LaunchCreated(launchId, TokenType.ERC1155, tokenContract, msg.sender);
         }
-
     }
-    
+
     // Admin functions
     function setAuthorizedCreator(address _creator, bool _authorized) external onlyOwner {
         authorizedCreators[_creator] = _authorized;
     }
-    
+
     function setPlatformFee(uint256 _platformFee) external onlyOwner {
         platformFee = _platformFee;
     }
-    
+
     function setFeeRecipient(address _feeRecipient) external onlyOwner {
         if (_feeRecipient == address(0)) revert InvalidFeeRecipient();
         feeRecipient = _feeRecipient;
     }
+
     function withdrawLockedFunds() external onlyOwner {
         uint256 balance = address(this).balance;
         if (balance == 0) revert NoFundsToWithdraw();
-        (bool sent, ) = owner().call{value: balance}("");
+        (bool sent,) = owner().call{value: balance}("");
         if (!sent) revert FailedToWithdrawFunds();
     }
-    
+
     // View functions
     function getLaunchInfo(uint256 _launchId) external view returns (LaunchConfig memory) {
         return launches[_launchId];
@@ -153,17 +155,16 @@ contract FractalLaunchpad is Ownable {
     function getERC721sByCreator(address _creator) external view returns (address[] memory) {
         return creatorToERC721s[_creator];
     }
-    
+
     function getERC1155sByCreator(address _creator) external view returns (address[] memory) {
         return creatorToERC1155s[_creator];
     }
-
 
     // Check if an address is a clone of our implementations
     function isERC721Clone(address _query) external view returns (bool) {
         return _isClone(ERC721_IMPLEMENTATION, _query);
     }
-    
+
     function isERC1155Clone(address _query) external view returns (bool) {
         return _isClone(ERC1155_IMPLEMENTATION, _query);
     }
@@ -171,5 +172,4 @@ contract FractalLaunchpad is Ownable {
     function _isClone(address _implementation, address _query) internal view returns (bool) {
         return nftFactory.isClone(_implementation, _query);
     }
-
 }

@@ -1,13 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
+
 import {LicenseVersion} from "./a16z/CantBeEvilUpgradeable.sol";
 
 interface IFractalLaunchpad {
-    function initialize(string memory _name, string memory _symbol, uint256 _maxSupply, string memory _baseURI, address _owner, uint96 _royaltyFee, LicenseVersion _licenseVersion) external;
+    function initialize(
+        string memory _name,
+        string memory _symbol,
+        uint256 _maxSupply,
+        string memory _baseURI,
+        address _owner,
+        uint96 _royaltyFee,
+        LicenseVersion _licenseVersion
+    ) external;
 }
 
 contract MinimalProxy {
-
     // Custom errors
     error InvalidImplementation();
     error ImplementationHasNoCode();
@@ -29,16 +37,19 @@ contract MinimalProxy {
      */
     function createClone(
         address _implementationContract,
-        string memory _name, string memory _symbol, uint256 _maxSupply, string memory _baseURI, address _owner, uint96 _royaltyFee, LicenseVersion _licenseVersion
+        string memory _name,
+        string memory _symbol,
+        uint256 _maxSupply,
+        string memory _baseURI,
+        address _owner,
+        uint96 _royaltyFee,
+        LicenseVersion _licenseVersion
     ) external returns (address) {
-        
         if (_implementationContract == address(0)) revert InvalidImplementation();
         if (_implementationContract.code.length == 0) revert ImplementationHasNoCode();
 
         // convert the address to 20 bytes
-        bytes20 implementationContractInBytes = bytes20(
-            _implementationContract
-        );
+        bytes20 implementationContractInBytes = bytes20(_implementationContract);
 
         //address to assign cloned proxy
         address proxy;
@@ -58,10 +69,7 @@ contract MinimalProxy {
             */
             let clone := mload(0x40)
             // store 32 bytes to memory starting at "clone"
-            mstore(
-                clone,
-                0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000
-            )
+            mstore(clone, 0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000)
 
             /*
               |              20 bytes                |
@@ -81,10 +89,7 @@ contract MinimalProxy {
             */
             // store 32 bytes to memory starting at "clone" + 40 bytes
             // 0x28 = 40
-            mstore(
-                add(clone, 0x28),
-                0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000
-            )
+            mstore(add(clone, 0x28), 0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000)
 
             /*
             |                 20 bytes                  |          20 bytes          |           15 bytes          |
@@ -97,8 +102,7 @@ contract MinimalProxy {
             // code size == 0x37 (55 bytes)
             proxy := create(0, clone, 0x37)
         }
-        IFractalLaunchpad(proxy).initialize( _name, _symbol, _maxSupply, _baseURI, _owner, _royaltyFee, _licenseVersion);
-
+        IFractalLaunchpad(proxy).initialize(_name, _symbol, _maxSupply, _baseURI, _owner, _royaltyFee, _licenseVersion);
 
         // Add the newly deployed contract address to the deployer's array
         deployerToContracts[msg.sender].push(proxy);
@@ -125,36 +129,24 @@ contract MinimalProxy {
      * @param _implementationContract The address of the implementation contract.
      * @param _query The address to check.
      */
-    function isClone(
-        address _implementationContract,
-        address _query
-    ) external view returns (bool result) {
-        bytes20 implementationContractInBytes = bytes20(
-            _implementationContract
-        );
+
+    function isClone(address _implementationContract, address _query) external view returns (bool result) {
+        bytes20 implementationContractInBytes = bytes20(_implementationContract);
         assembly {
             let clone := mload(0x40)
-            mstore(
-                clone,
-                0x363d3d373d3d3d363d7300000000000000000000000000000000000000000000
-            )
+            mstore(clone, 0x363d3d373d3d3d363d7300000000000000000000000000000000000000000000)
             mstore(add(clone, 0xa), implementationContractInBytes)
-            mstore(
-                add(clone, 0x1e),
-                0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000
-            )
+            mstore(add(clone, 0x1e), 0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000)
 
             let other := add(clone, 0x40)
             extcodecopy(_query, other, 0, 0x2d)
-            result := and(
-                eq(mload(clone), mload(other)),
-                eq(mload(add(clone, 0xd)), mload(add(other, 0xd)))
-            )
+            result := and(eq(mload(clone), mload(other)), eq(mload(add(clone, 0xd)), mload(add(other, 0xd))))
         }
     }
     /**
      * @dev Returns all created clone contract addresses.
      */
+
     function getAllCreatedAddresses() external view returns (address[] memory) {
         return allClonedContracts;
     }
@@ -162,10 +154,8 @@ contract MinimalProxy {
      * @dev Returns all proxy contract addresses created by a specific deployer.
      * @param _deployerAddr The address of the deployer whose proxies are to be retrieved.
      */
-    function getAllProxiesByDeployer( address _deployerAddr) external view returns (address[] memory) {
+
+    function getAllProxiesByDeployer(address _deployerAddr) external view returns (address[] memory) {
         return deployerToContracts[_deployerAddr];
     }
-
-    
-
 }

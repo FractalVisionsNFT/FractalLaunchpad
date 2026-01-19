@@ -7,8 +7,13 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "./a16z/CantBeEvilUpgradeable.sol";
 
-contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable, UUPSUpgradeable, CantBeEvilUpgradeable, ERC2981 {
-
+contract FractalERC1155Impl is
+    ERC1155Upgradeable,
+    OwnableUpgradeable,
+    UUPSUpgradeable,
+    CantBeEvilUpgradeable,
+    ERC2981
+{
     // Custom errors
     error MaxSupplyExceeded();
     error MaxSupplyBelowCurrentSupply();
@@ -27,7 +32,7 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable, UUPSUpgra
     event LicenseVersionSet(LicenseVersion indexed licenseVersion);
 
     // note: maxSupply is only set for token ID 0 during initialization, for other IDs it can be set later using the setMaxSupply function
-   /**
+    /**
      * @dev Initializes the contract
      * @param _name Token collection name
      * @param _symbol Token collection symbol
@@ -38,7 +43,7 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable, UUPSUpgra
      * @param _licenseVersion License type for NFT usage rights
      */
     function initialize(
-        string memory _name,    
+        string memory _name,
         string memory _symbol,
         uint256 _maxSupply,
         string memory _baseURI,
@@ -54,29 +59,22 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable, UUPSUpgra
         name = _name;
         symbol = _symbol;
         maxSupply[0] = _maxSupply;
-        
+
         emit LicenseVersionSet(_licenseVersion);
     }
-    
-    function mint(
-        address _to,
-        uint256 _id,
-        uint256 _amount,
-        bytes memory _data
-    ) external onlyOwner {
+
+    function mint(address _to, uint256 _id, uint256 _amount, bytes memory _data) external onlyOwner {
         if (maxSupply[_id] > 0) {
             if (totalSupply[_id] + _amount > maxSupply[_id]) revert MaxSupplyExceeded();
         }
         totalSupply[_id] += _amount;
         _mint(_to, _id, _amount, _data);
     }
-    
-    function batchMint(
-        address _to,
-        uint256[] memory _ids,
-        uint256[] memory _amounts,
-        bytes memory _data
-    ) external onlyOwner {
+
+    function batchMint(address _to, uint256[] memory _ids, uint256[] memory _amounts, bytes memory _data)
+        external
+        onlyOwner
+    {
         if (_ids.length != _amounts.length) revert LengthMismatch();
 
         for (uint256 i = 0; i < _ids.length; i++) {
@@ -88,20 +86,20 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable, UUPSUpgra
 
         _mintBatch(_to, _ids, _amounts, _data);
     }
-    
+
     function setMaxSupply(uint256 _id, uint256 _maxSupply) external onlyOwner {
         if (_maxSupply < totalSupply[_id]) revert MaxSupplyBelowCurrentSupply();
         maxSupply[_id] = _maxSupply;
 
-         emit MaxSupplySet(_id, _maxSupply);
+        emit MaxSupplySet(_id, _maxSupply);
     }
-    
+
     function setTokenURI(uint256 _id, string memory _tokenURI) external onlyOwner {
         tokenURIs[_id] = _tokenURI;
 
         emit TokenURISet(_id, _tokenURI);
     }
-    
+
     function uri(uint256 _id) public view override returns (string memory) {
         return bytes(tokenURIs[_id]).length > 0 ? tokenURIs[_id] : super.uri(_id);
     }
@@ -130,17 +128,15 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable, UUPSUpgra
     /**
      * @dev Override supportsInterface to include all parent contracts
      */
-    function supportsInterface(bytes4 interfaceId) 
-        public 
-        view 
-        virtual 
-        override(ERC1155Upgradeable, CantBeEvilUpgradeable, ERC2981) 
-        returns (bool) 
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override(ERC1155Upgradeable, CantBeEvilUpgradeable, ERC2981)
+        returns (bool)
     {
-        return 
-            ERC1155Upgradeable.supportsInterface(interfaceId) ||
-            CantBeEvilUpgradeable.supportsInterface(interfaceId) ||
-            ERC2981.supportsInterface(interfaceId);
+        return ERC1155Upgradeable.supportsInterface(interfaceId) || CantBeEvilUpgradeable.supportsInterface(interfaceId)
+            || ERC2981.supportsInterface(interfaceId);
     }
 
     /**

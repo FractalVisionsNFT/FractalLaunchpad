@@ -15,21 +15,21 @@ enum LicenseVersion {
 }
 
 abstract contract CantBeEvilUpgradeable is ERC165Upgradeable, ICantBeEvil {
-    using Strings for uint;
-    
+    using Strings for uint256;
+
     string internal constant _BASE_LICENSE_URI = "ar://zmc1WTspIhFyVY82bwfAIcIExLFH5lUcHHUN0wXg4W8/";
     LicenseVersion internal licenseVersion;
-    
+
     function __CantBeEvil_init(LicenseVersion _licenseVersion) internal onlyInitializing {
         __CantBeEvil_init_unchained(_licenseVersion);
     }
-    
+
     function __CantBeEvil_init_unchained(LicenseVersion _licenseVersion) internal onlyInitializing {
         licenseVersion = _licenseVersion;
     }
 
     function getLicenseURI() public view returns (string memory) {
-        return string.concat(_BASE_LICENSE_URI, uint(licenseVersion).toString());
+        return string.concat(_BASE_LICENSE_URI, uint256(licenseVersion).toString());
     }
 
     function getLicenseName() public view returns (string memory) {
@@ -37,9 +37,7 @@ abstract contract CantBeEvilUpgradeable is ERC165Upgradeable, ICantBeEvil {
     }
 
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165Upgradeable) returns (bool) {
-        return
-            interfaceId == type(ICantBeEvil).interfaceId ||
-            super.supportsInterface(interfaceId);
+        return interfaceId == type(ICantBeEvil).interfaceId || super.supportsInterface(interfaceId);
     }
 
     function _getLicenseVersionKeyByValue(LicenseVersion _licenseVersion) internal pure returns (string memory) {
