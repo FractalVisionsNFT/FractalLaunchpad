@@ -27,7 +27,7 @@ contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
         string memory _name,
         string memory _symbol,
         uint256 _maxSupply,
-        string memory _baseURI,
+        string memory _baseUri,
         address _owner,
         uint96 _royaltyFee,  //500 = 5%
         LicenseVersion _licenseVersion  
@@ -38,7 +38,7 @@ contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
         __UUPSUpgradeable_init();
         _setDefaultRoyalty(_owner, _royaltyFee);
         maxSupply = _maxSupply;
-        baseTokenURI = _baseURI;
+        baseTokenURI = _baseUri;
 
         emit LicenseVersionSet(_licenseVersion);
     }
@@ -64,9 +64,9 @@ contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
         emit MaxSupplySet(_maxSupply);
     }
     
-    function setBaseURI(string calldata _baseURI) external onlyOwner {
-        baseTokenURI = _baseURI;
-        emit BaseURISet(_baseURI);
+    function setBaseURI(string calldata _baseUri) external onlyOwner {
+        baseTokenURI = _baseUri;
+        emit BaseURISet(_baseUri);
     }
     
     function _baseURI() internal view override returns (string memory) {

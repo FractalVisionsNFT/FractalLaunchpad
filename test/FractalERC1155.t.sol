@@ -1227,4 +1227,222 @@ contract FractalERC1155Test is Test {
         assertTrue(nft2.supportsInterface(interfaceId));
         assertTrue(nft.supportsInterface(interfaceId));
     }
+    
+    // ============ ERC2981 Royalty Tests ============
+    
+    function test_Royalty_CorrectCalculation() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 0, 10, "");
+        vm.stopPrank();
+        
+        uint256 salePrice = 1 ether;
+        (address receiver, uint256 royaltyAmount) = nft.royaltyInfo(0, salePrice);
+        
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, 0.05 ether); // 5% of 1 ether
+    }
+    
+    function test_Royalty_DifferentSalePrices() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 0, 10, "");
+        vm.stopPrank();
+        
+        // Test with 10 ether
+        (address receiver, uint256 royaltyAmount) = nft.royaltyInfo(0, 10 ether);
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, 0.5 ether); // 5% of 10 ether
+        
+        // Test with 0.1 ether
+        (receiver, royaltyAmount) = nft.royaltyInfo(0, 0.1 ether);
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, 0.005 ether); // 5% of 0.1 ether
+        
+        // Test with 100 wei
+        (receiver, royaltyAmount) = nft.royaltyInfo(0, 100);
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, 5); // 5% of 100
+    }
+    
+    function test_Royalty_ZeroSalePrice() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 0, 10, "");
+        vm.stopPrank();
+        
+        (address receiver, uint256 royaltyAmount) = nft.royaltyInfo(0, 0);
+        
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, 0);
+    }
+    
+    function test_Royalty_MaxSalePrice() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 0, 10, "");
+        vm.stopPrank();
+        
+        // Use a very large but safe value to avoid overflow
+        uint256 maxPrice = type(uint128).max;
+        (address receiver, uint256 royaltyAmount) = nft.royaltyInfo(0, maxPrice);
+        
+        assertEq(receiver, owner);
+        // 5% of max uint128
+        assertEq(royaltyAmount, (maxPrice * ROYALTY_FEE) / 10000);
+        
+        // Royalty should be reasonable percentage of sale price
+        assertTrue(royaltyAmount <= maxPrice);
+        assertTrue(royaltyAmount > 0);
+    }
+    
+    function test_Royalty_NonExistentToken() public {
+        // ERC2981 doesn't require token to exist, should still return royalty info
+        (address receiver, uint256 royaltyAmount) = nft.royaltyInfo(999, 1 ether);
+        
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, 0.05 ether);
+    }
+    
+    function test_Royalty_DifferentRoyaltyFees() public {
+        // Test with 10% royalty (1000 basis points)
+        FractalERC1155Impl nft10 = new FractalERC1155Impl();
+        nft10.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, 1000, LicenseVersion.PUBLIC);
+        
+        (address receiver, uint256 royaltyAmount) = nft10.royaltyInfo(0, 1 ether);
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, 0.1 ether); // 10%
+        
+        // Test with 2.5% royalty (250 basis points)
+        FractalERC1155Impl nft25 = new FractalERC1155Impl();
+        nft25.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, 250, LicenseVersion.PUBLIC);
+        
+        (receiver, royaltyAmount) = nft25.royaltyInfo(0, 1 ether);
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, 0.025 ether); // 2.5%
+        
+        // Test with 0% royalty
+        FractalERC1155Impl nft0 = new FractalERC1155Impl();
+        nft0.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, 0, LicenseVersion.PUBLIC);
+        
+        (receiver, royaltyAmount) = nft0.royaltyInfo(0, 1 ether);
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, 0); // 0%
+    }
+    
+    function test_Royalty_ReceiverIsOwner() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 0, 10, "");
+        vm.stopPrank();
+        
+        (address receiver,) = nft.royaltyInfo(0, 1 ether);
+        
+        // Royalty receiver should be the owner
+        assertEq(receiver, owner);
+    }
+    
+    function test_Royalty_AfterTokenTransfer() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 0, 10, "");
+        vm.stopPrank();
+        
+        // Transfer tokens to user2
+        vm.startPrank(user1);
+        nft.safeTransferFrom(user1, user2, 0, 5, "");
+        vm.stopPrank();
+        
+        // Royalty should still go to original owner, not new token holder
+        (address receiver, uint256 royaltyAmount) = nft.royaltyInfo(0, 1 ether);
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, 0.05 ether);
+    }
+    
+    function test_Royalty_AfterBurn() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 0, 10, "");
+        vm.stopPrank();
+        
+        vm.startPrank(user1);
+        nft.burn(user1, 0, 10);
+        vm.stopPrank();
+        
+        // Royalty info should still be available even after burn
+        (address receiver, uint256 royaltyAmount) = nft.royaltyInfo(0, 1 ether);
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, 0.05 ether);
+    }
+    
+    function test_Royalty_MultipleTokenIdsSameRoyalty() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 0, 10, "");
+        nft.mint(user1, 1, 20, "");
+        nft.mint(user2, 2, 30, "");
+        vm.stopPrank();
+        
+        // All token IDs should have same royalty info
+        (address receiver0, uint256 amount0) = nft.royaltyInfo(0, 1 ether);
+        (address receiver1, uint256 amount1) = nft.royaltyInfo(1, 1 ether);
+        (address receiver2, uint256 amount2) = nft.royaltyInfo(2, 1 ether);
+        
+        assertEq(receiver0, owner);
+        assertEq(receiver1, owner);
+        assertEq(receiver2, owner);
+        assertEq(amount0, 0.05 ether);
+        assertEq(amount1, 0.05 ether);
+        assertEq(amount2, 0.05 ether);
+    }
+    
+    function test_Royalty_DifferentAmountsOfSameToken() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 0, 100, "");
+        vm.stopPrank();
+        
+        // Royalty should be based on sale price, not token amount
+        (address receiver, uint256 royaltyAmount) = nft.royaltyInfo(0, 1 ether);
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, 0.05 ether);
+        
+        // Even if selling multiple tokens, royalty is per-sale-price
+        (receiver, royaltyAmount) = nft.royaltyInfo(0, 10 ether);
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, 0.5 ether);
+    }
+    
+    // ============ Fuzz Tests for Royalty ============
+    
+    function testFuzz_Royalty_VariousSalePrices(uint256 salePrice) public {
+        vm.assume(salePrice <= type(uint128).max); // Prevent overflow in calculation
+        
+        vm.startPrank(owner);
+        nft.mint(user1, 0, 10, "");
+        vm.stopPrank();
+        
+        (address receiver, uint256 royaltyAmount) = nft.royaltyInfo(0, salePrice);
+        
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, (salePrice * ROYALTY_FEE) / 10000);
+        
+        // Royalty should never exceed sale price
+        assertTrue(royaltyAmount <= salePrice);
+    }
+    
+    function testFuzz_Royalty_VariousTokenIds(uint256 tokenId) public {
+        (address receiver, uint256 royaltyAmount) = nft.royaltyInfo(tokenId, 1 ether);
+        
+        // Should return consistent royalty info regardless of token ID
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, 0.05 ether);
+    }
+    
+    function testFuzz_Royalty_VariousFees(uint96 royaltyFee) public {
+        vm.assume(royaltyFee <= 10000); // Max 100% royalty
+        
+        FractalERC1155Impl customNft = new FractalERC1155Impl();
+        customNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, royaltyFee, LicenseVersion.PUBLIC);
+        
+        uint256 salePrice = 1 ether;
+        (address receiver, uint256 royaltyAmount) = customNft.royaltyInfo(0, salePrice);
+        
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, (salePrice * royaltyFee) / 10000);
+        
+        // Royalty should never exceed 100% of sale price
+        assertTrue(royaltyAmount <= salePrice);
+    }
 }
