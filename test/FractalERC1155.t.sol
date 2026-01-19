@@ -918,6 +918,10 @@ contract FractalERC1155Test is Test {
         bytes4 erc1155InterfaceId = 0xd9b67a26;
         assertTrue(nft.supportsInterface(erc1155InterfaceId));
         
+        // Test that it supports ERC2981 (royalty) interface
+        bytes4 erc2981InterfaceId = 0x2a55205a;
+        assertTrue(nft.supportsInterface(erc2981InterfaceId));
+        
         // Test that it still supports ERC165 interface
         bytes4 erc165InterfaceId = 0x01ffc9a7;
         assertTrue(nft.supportsInterface(erc165InterfaceId));

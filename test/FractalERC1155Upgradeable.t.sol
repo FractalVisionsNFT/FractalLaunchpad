@@ -95,6 +95,7 @@ contract FractalERC1155UpgradeableTest is Test {
             MAX_SUPPLY,
             BASE_URI,
             owner,
+            ROYALTY_FEE,
             LicenseVersion.COMMERCIAL
         );
         
@@ -166,6 +167,7 @@ contract FractalERC1155UpgradeableTest is Test {
                 MAX_SUPPLY,
                 BASE_URI,
                 owner,
+                ROYALTY_FEE,
                 licenses[i]
             );
             

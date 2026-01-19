@@ -88,7 +88,10 @@ contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
         override(ERC721Upgradeable, CantBeEvilUpgradeable, ERC2981) 
         returns (bool) 
     {
-        return super.supportsInterface(interfaceId);
+        return 
+            ERC721Upgradeable.supportsInterface(interfaceId) ||
+            CantBeEvilUpgradeable.supportsInterface(interfaceId) ||
+            ERC2981.supportsInterface(interfaceId);
     }
 
     // UUPS Upgrade authorization - only owner can upgrade

@@ -137,7 +137,10 @@ contract FractalERC1155Impl is ERC1155Upgradeable, OwnableUpgradeable, UUPSUpgra
         override(ERC1155Upgradeable, CantBeEvilUpgradeable, ERC2981) 
         returns (bool) 
     {
-        return super.supportsInterface(interfaceId);
+        return 
+            ERC1155Upgradeable.supportsInterface(interfaceId) ||
+            CantBeEvilUpgradeable.supportsInterface(interfaceId) ||
+            ERC2981.supportsInterface(interfaceId);
     }
 
     /**
