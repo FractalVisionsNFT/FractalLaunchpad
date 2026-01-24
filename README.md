@@ -214,6 +214,28 @@ $ forge test --summary
 - Overpayments during Launch are not refunded. Our UI is designed to prevent this by guiding users to pay the accurate fee.
 -  For ERC1155, maxSupply is only set for token ID 0 during initialization, for other IDs, it can be set later using the setMaxSupply function
 
+## Deployment
+
+### Base Sepolia Testnet
+
+All contracts are deployed and verified on Base Sepolia:
+
+1. **FractalERC721 Implementation**
+   - Address: `0x89Fbe4c8D8ff2679Bc97dE1140f7c6Ac01b9B1Ef`
+   - [View on Blockscout](https://base-sepolia.blockscout.com/address/0x89Fbe4c8D8ff2679Bc97dE1140f7c6Ac01b9B1Ef)
+
+2. **FractalERC1155 Implementation**
+   - Address: `0xEC151c90047aF420cF62f32840580Eb8764862b6`
+   - [View on Blockscout](https://base-sepolia.blockscout.com/address/0xEC151c90047aF420cF62f32840580Eb8764862b6)
+
+3. **MinimalProxy Factory**
+   - Address: `0xfB86636532Dec2F7e2006261Eda917d97D3E58c5`
+   - [View on Blockscout](https://base-sepolia.blockscout.com/address/0xfB86636532Dec2F7e2006261Eda917d97D3E58c5)
+
+4. **FractalLaunchpad**
+   - Address: `0x22797574900038d794234B4fBE0446288ee46c91`
+   - [View on Blockscout](https://base-sepolia.blockscout.com/address/0x22797574900038d794234B4fBE0446288ee46c91)
+
 ## License
 
 This project includes licenses from multiple sources:
