@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {LicenseVersion} from "./a16z/CantBeEvilUpgradeable.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+
 
 interface IFractalLaunchpad {
     function initialize(
@@ -15,7 +17,10 @@ interface IFractalLaunchpad {
     ) external;
 }
 
-contract MinimalProxy {
+contract MinimalProxy is AccessControl {
+
+    bytes32 public constant CREATOR_ROLE = keccak256("CREATOR_ROLE");
+
     // Custom errors
     error InvalidImplementation();
     error ImplementationHasNoCode();
@@ -23,6 +28,11 @@ contract MinimalProxy {
     mapping(address => address[]) public deployerToContracts; //deployer => contract addressses
 
     address[] public allClonedContracts;
+
+    constructor(){
+        _grantRole(CREATOR_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    }
 
     /**
      * @dev Creates a minimal proxy clone of the implementation contract.
@@ -44,7 +54,7 @@ contract MinimalProxy {
         address _owner,
         uint96 _royaltyFee,
         LicenseVersion _licenseVersion
-    ) external returns (address) {
+    ) external onlyRole(CREATOR_ROLE) returns (address) {
         if (_implementationContract == address(0)) revert InvalidImplementation();
         if (_implementationContract.code.length == 0) revert ImplementationHasNoCode();
 

@@ -54,6 +54,9 @@ contract FractalLaunchpadTest is Test {
             feeRecipient, PLATFORM_FEE, address(erc1155Implementation), address(erc721Implementation), address(factory)
         );
 
+        // Grant CREATOR_ROLE to the launchpad so it can call createClone
+        factory.grantRole(factory.CREATOR_ROLE(), address(launchpad));
+
         vm.stopPrank();
 
         // Give some ETH to users
