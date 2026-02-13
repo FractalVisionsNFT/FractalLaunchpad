@@ -216,6 +216,26 @@ $ forge test --summary
 
 ## Deployment
 
+### Optimism Sepolia Testnet
+
+All contracts are deployed and verified on Optimism Sepolia:
+
+1. **FractalERC721 Implementation**
+   - Address: `0x473Ffc0f943B1a39576D98537133C6ae688d135e`
+   - [View on Etherscan](https://sepolia-optimism.etherscan.io/address/0x473Ffc0f943B1a39576D98537133C6ae688d135e)
+
+2. **FractalERC1155 Implementation**
+   - Address: `0xe850E1BF5Cfb124B5D986A301e925aBBaDC34F9C`
+   - [View on Etherscan](https://sepolia-optimism.etherscan.io/address/0xe850E1BF5Cfb124B5D986A301e925aBBaDC34F9C)
+
+3. **MinimalProxy Factory**
+   - Address: `0xde94151D90F215925BA69f3014E554bf885449f3`
+   - [View on Etherscan](https://sepolia-optimism.etherscan.io/address/0xde94151D90F215925BA69f3014E554bf885449f3)
+
+4. **FractalLaunchpad**
+   - Address: `0xe2a880075Dc5Ec5D6F788BbD25042F51A3BaB27b`
+   - [View on Etherscan](https://sepolia-optimism.etherscan.io/address/0xe2a880075Dc5Ec5D6F788BbD25042F51A3BaB27b)
+
 ### Base Sepolia Testnet
 
 All contracts are deployed and verified on Base Sepolia:
