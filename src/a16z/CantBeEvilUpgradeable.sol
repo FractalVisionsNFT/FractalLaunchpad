@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
-import "@a16z/contracts/licenses/ICantBeEvil.sol";
+import {ERC165Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {ICantBeEvil} from "@a16z/contracts/licenses/ICantBeEvil.sol";
 
 enum LicenseVersion {
     PUBLIC,

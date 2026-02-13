@@ -4,8 +4,8 @@ pragma solidity ^0.8.24;
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ERC1155Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts/token/common/ERC2981.sol";
-import "./a16z/CantBeEvilUpgradeable.sol";
+import {ERC2981} from "@openzeppelin/contracts/token/common/ERC2981.sol";
+import {CantBeEvilUpgradeable, LicenseVersion} from "./a16z/CantBeEvilUpgradeable.sol";
 
 contract FractalERC1155Impl is
     ERC1155Upgradeable,

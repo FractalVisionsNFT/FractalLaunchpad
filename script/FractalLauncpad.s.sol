@@ -36,6 +36,10 @@ contract FractalLaunchpadScript is Script {
         );
         console.log("FractalLaunchpad deployed at:", address(launchpad));
 
+        // 4. Grant CREATOR_ROLE to launchpad so it can call createClone on the factory
+        factory.grantRole(factory.CREATOR_ROLE(), address(launchpad));
+        console.log("Granted CREATOR_ROLE to Launchpad");
+
         vm.stopBroadcast();
 
         // Log summary

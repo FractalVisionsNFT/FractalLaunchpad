@@ -6,7 +6,7 @@ import {LicenseVersion, FractalERC721Impl} from "../src/FractalERC721.sol";
 import {ICantBeEvil} from "@a16z/contracts/licenses/ICantBeEvil.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+
 
 // Mock upgraded version for testing
 contract FractalERC721ImplV2 is FractalERC721Impl {

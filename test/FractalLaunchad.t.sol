@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {FractalLaunchpad} from "../src/FractalLaunchpad.sol";
 import {MinimalProxy} from "../src/Factory.sol";
 import {FractalERC721Impl} from "../src/FractalERC721.sol";
@@ -71,7 +71,7 @@ contract FractalLaunchpadTest is Test {
         assertEq(launchpad.owner(), owner);
         assertEq(launchpad.feeRecipient(), feeRecipient);
         assertEq(launchpad.platformFee(), PLATFORM_FEE);
-        assertEq(address(launchpad.nftFactory()), address(factory));
+        assertEq(address(launchpad.NFT_FACTORY()), address(factory));
         assertEq(launchpad.ERC721_IMPLEMENTATION(), address(erc721Implementation));
         assertEq(launchpad.ERC1155_IMPLEMENTATION(), address(erc1155Implementation));
         assertEq(launchpad.nextLaunchId(), 0);

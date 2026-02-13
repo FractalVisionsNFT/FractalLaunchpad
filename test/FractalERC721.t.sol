@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {LicenseVersion, FractalERC721Impl} from "../src/FractalERC721.sol";
 import {ICantBeEvil} from "@a16z/contracts/licenses/ICantBeEvil.sol";
 

@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
-import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {MinimalProxy} from "./Factory.sol";
-import {FractalERC721Impl} from "./FractalERC721.sol";
-import {LicenseVersion, FractalERC1155Impl} from "./FractalERC1155.sol";
+import {LicenseVersion} from "./FractalERC1155.sol";
 
 contract FractalLaunchpad is Ownable {
     struct LaunchConfig {
@@ -39,7 +36,7 @@ contract FractalLaunchpad is Ownable {
     uint256 public platformFee;
     address public feeRecipient;
     uint256 public nextLaunchId;
-    MinimalProxy public immutable nftFactory;
+    MinimalProxy public immutable NFT_FACTORY;
 
     mapping(address => address[]) public creatorToERC721s;
     mapping(address => address[]) public creatorToERC1155s;
@@ -62,7 +59,7 @@ contract FractalLaunchpad is Ownable {
 
         feeRecipient = _feeRecipient;
         platformFee = _fee;
-        nftFactory = MinimalProxy(_factory);
+        NFT_FACTORY = MinimalProxy(_factory);
         ERC1155_IMPLEMENTATION = _erc1155;
         ERC721_IMPLEMENTATION = _erc721;
     }
@@ -88,7 +85,7 @@ contract FractalLaunchpad is Ownable {
         }
 
         if (_tokenType == TokenType.ERC721) {
-            address tokenContract = nftFactory.createClone(
+            address tokenContract = NFT_FACTORY.createClone(
                 ERC721_IMPLEMENTATION, _name, _symbol, _maxSupply, _baseURI, msg.sender, _royaltyFee, _licenseVersion
             );
 
@@ -107,7 +104,7 @@ contract FractalLaunchpad is Ownable {
 
             emit LaunchCreated(launchId, TokenType.ERC721, tokenContract, msg.sender);
         } else {
-            address tokenContract = nftFactory.createClone(
+            address tokenContract = NFT_FACTORY.createClone(
                 ERC1155_IMPLEMENTATION, _name, _symbol, _maxSupply, _baseURI, msg.sender, _royaltyFee, _licenseVersion
             );
             launches[launchId] = LaunchConfig({
@@ -170,6 +167,6 @@ contract FractalLaunchpad is Ownable {
     }
 
     function _isClone(address _implementation, address _query) internal view returns (bool) {
-        return nftFactory.isClone(_implementation, _query);
+        return NFT_FACTORY.isClone(_implementation, _query);
     }
 }

@@ -4,9 +4,9 @@ pragma solidity ^0.8.24;
 import {ERC721Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts/token/common/ERC2981.sol";
+import {ERC2981} from "@openzeppelin/contracts/token/common/ERC2981.sol";
 
-import "./a16z/CantBeEvilUpgradeable.sol";
+import {CantBeEvilUpgradeable, LicenseVersion} from "./a16z/CantBeEvilUpgradeable.sol";
 
 contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable, CantBeEvilUpgradeable, ERC2981 {
     error MaxSupplyBelowCurrentSupply();
