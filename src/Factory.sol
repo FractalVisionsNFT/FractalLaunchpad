@@ -86,13 +86,6 @@ contract ProxyFactory is AccessControl {
     }
 
     /**
-     * @dev Returns the current number of deployed proxies.
-     */
-    function getCurrentIndex() external view returns (uint256) {
-        return allProxyContracts.length;
-    }
-
-    /**
      * @dev Checks if a given address was deployed as a proxy of a specific implementation.
      * @param _implementationContract The address of the implementation contract.
      * @param _query The address to check.

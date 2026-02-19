@@ -29,7 +29,7 @@ contract FractalERC1155Impl is
     mapping(uint256 => string) public tokenURIs;
 
     event MaxSupplySet(uint256 indexed tokenId, uint256 maxSupply);
-    event TokenURISet(uint256 indexed tokenId, string tokenURI);
+    event BaseURISet(string baseURI);
     event LicenseVersionSet(LicenseVersion indexed licenseVersion);
 
     // note: maxSupply is only set for token ID 0 during initialization, for other IDs it can be set later using the setMaxSupply function
@@ -98,7 +98,14 @@ contract FractalERC1155Impl is
     function setTokenURI(uint256 _id, string memory _tokenURI) external onlyOwner {
         tokenURIs[_id] = _tokenURI;
 
-        emit TokenURISet(_id, _tokenURI);
+        emit URI(_tokenURI, _id);
+    }
+
+    function setBaseURI(string memory _baseURI) external onlyOwner {
+        _setURI(_baseURI);
+
+        emit BaseURISet(_baseURI);
+        // Note: standard URI event not emitted here as base URI changes affect all token IDs (dynamic/programmatic change per EIP-1155)
     }
 
     function uri(uint256 _id) public view override returns (string memory) {
