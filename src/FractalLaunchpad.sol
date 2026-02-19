@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {MinimalProxy} from "./Factory.sol";
+import {ProxyFactory} from "./Factory.sol";
 import {LicenseVersion} from "./FractalERC1155.sol";
 
 contract FractalLaunchpad is Ownable {
@@ -31,12 +31,12 @@ contract FractalLaunchpad is Ownable {
     error NoFundsToWithdraw();
     error FailedToWithdrawFunds();
 
-    address public immutable ERC721_IMPLEMENTATION;
-    address public immutable ERC1155_IMPLEMENTATION;
+    address public erc721Implementation;
+    address public erc1155Implementation;
     uint256 public platformFee;
     address public feeRecipient;
     uint256 public nextLaunchId;
-    MinimalProxy public immutable NFT_FACTORY;
+    ProxyFactory public immutable NFT_FACTORY;
 
     mapping(address => address[]) public creatorToERC721s;
     mapping(address => address[]) public creatorToERC1155s;
@@ -48,6 +48,8 @@ contract FractalLaunchpad is Ownable {
     event LaunchCreated(
         uint256 launchId, TokenType indexed tokenType, address indexed tokenContract, address indexed creator
     );
+    event ERC721ImplementationUpdated(address indexed oldImplementation, address indexed newImplementation);
+    event ERC1155ImplementationUpdated(address indexed oldImplementation, address indexed newImplementation);
 
     constructor(address _feeRecipient, uint256 _fee, address _erc1155, address _erc721, address _factory)
         Ownable(msg.sender)
@@ -59,9 +61,9 @@ contract FractalLaunchpad is Ownable {
 
         feeRecipient = _feeRecipient;
         platformFee = _fee;
-        NFT_FACTORY = MinimalProxy(_factory);
-        ERC1155_IMPLEMENTATION = _erc1155;
-        ERC721_IMPLEMENTATION = _erc721;
+        NFT_FACTORY = ProxyFactory(_factory);
+        erc1155Implementation = _erc1155;
+        erc721Implementation = _erc721;
     }
 
     function createLaunch(
@@ -86,7 +88,7 @@ contract FractalLaunchpad is Ownable {
 
         if (_tokenType == TokenType.ERC721) {
             address tokenContract = NFT_FACTORY.createClone(
-                ERC721_IMPLEMENTATION, _name, _symbol, _maxSupply, _baseURI, msg.sender, _royaltyFee, _licenseVersion
+                erc721Implementation, _name, _symbol, _maxSupply, _baseURI, msg.sender, _royaltyFee, _licenseVersion
             );
 
             launches[launchId] = LaunchConfig({
@@ -105,7 +107,7 @@ contract FractalLaunchpad is Ownable {
             emit LaunchCreated(launchId, TokenType.ERC721, tokenContract, msg.sender);
         } else {
             address tokenContract = NFT_FACTORY.createClone(
-                ERC1155_IMPLEMENTATION, _name, _symbol, _maxSupply, _baseURI, msg.sender, _royaltyFee, _licenseVersion
+                erc1155Implementation, _name, _symbol, _maxSupply, _baseURI, msg.sender, _royaltyFee, _licenseVersion
             );
             launches[launchId] = LaunchConfig({
                 tokenType: TokenType.ERC1155,
@@ -137,6 +139,18 @@ contract FractalLaunchpad is Ownable {
         feeRecipient = _feeRecipient;
     }
 
+    function updateERC721Implementation(address _erc721) external onlyOwner {
+        if (_erc721 == address(0)) revert InvalidERC721Implementation();
+        emit ERC721ImplementationUpdated(erc721Implementation, _erc721);
+        erc721Implementation = _erc721;
+    }
+
+    function updateERC1155Implementation(address _erc1155) external onlyOwner {
+        if (_erc1155 == address(0)) revert InvalidERC1155Implementation();
+        emit ERC1155ImplementationUpdated(erc1155Implementation, _erc1155);
+        erc1155Implementation = _erc1155;
+    }
+
     function withdrawLockedFunds() external onlyOwner {
         uint256 balance = address(this).balance;
         if (balance == 0) revert NoFundsToWithdraw();
@@ -159,11 +173,11 @@ contract FractalLaunchpad is Ownable {
 
     // Check if an address is a clone of our implementations
     function isERC721Clone(address _query) external view returns (bool) {
-        return _isClone(ERC721_IMPLEMENTATION, _query);
+        return _isClone(erc721Implementation, _query);
     }
 
     function isERC1155Clone(address _query) external view returns (bool) {
-        return _isClone(ERC1155_IMPLEMENTATION, _query);
+        return _isClone(erc1155Implementation, _query);
     }
 
     function _isClone(address _implementation, address _query) internal view returns (bool) {

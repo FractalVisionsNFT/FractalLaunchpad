@@ -46,7 +46,7 @@ contract FractalERC1155Test is Test {
         assertEq(nft.name(), NAME);
         assertEq(nft.symbol(), SYMBOL);
         assertEq(nft.maxSupply(0), MAX_SUPPLY);
-        assertEq(nft.uri(0), BASE_URI);
+        assertEq(nft.uri(0), string.concat(BASE_URI, "0"));
         assertEq(nft.owner(), owner);
         assertEq(nft.totalSupply(0), 0);
     }
@@ -358,8 +358,8 @@ contract FractalERC1155Test is Test {
     }
 
     function test_URI_FallbackToBaseURI() public {
-        // Token without custom URI should return base URI
-        assertEq(nft.uri(5), BASE_URI);
+        // Token without custom URI should return base URI + token ID
+        assertEq(nft.uri(5), string.concat(BASE_URI, "5"));
     }
 
     function test_URI_CustomOverridesBase() public {

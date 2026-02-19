@@ -3,13 +3,13 @@ pragma solidity ^0.8.13;
 
 import {Test} from "forge-std/Test.sol";
 import {FractalLaunchpad} from "../src/FractalLaunchpad.sol";
-import {MinimalProxy} from "../src/Factory.sol";
+import {ProxyFactory} from "../src/Factory.sol";
 import {FractalERC721Impl} from "../src/FractalERC721.sol";
 import {LicenseVersion, FractalERC1155Impl} from "../src/FractalERC1155.sol";
 
 contract FractalLaunchpadTest is Test {
     FractalLaunchpad public launchpad;
-    MinimalProxy public factory;
+    ProxyFactory public factory;
     FractalERC721Impl public erc721Implementation;
     FractalERC1155Impl public erc1155Implementation;
 
@@ -47,7 +47,7 @@ contract FractalLaunchpadTest is Test {
         erc1155Implementation = new FractalERC1155Impl();
 
         // Deploy factory
-        factory = new MinimalProxy();
+        factory = new ProxyFactory();
 
         // Deploy launchpad
         launchpad = new FractalLaunchpad(
@@ -72,8 +72,8 @@ contract FractalLaunchpadTest is Test {
         assertEq(launchpad.feeRecipient(), feeRecipient);
         assertEq(launchpad.platformFee(), PLATFORM_FEE);
         assertEq(address(launchpad.NFT_FACTORY()), address(factory));
-        assertEq(launchpad.ERC721_IMPLEMENTATION(), address(erc721Implementation));
-        assertEq(launchpad.ERC1155_IMPLEMENTATION(), address(erc1155Implementation));
+        assertEq(launchpad.erc721Implementation(), address(erc721Implementation));
+        assertEq(launchpad.erc1155Implementation(), address(erc1155Implementation));
         assertEq(launchpad.nextLaunchId(), 0);
     }
 
@@ -675,5 +675,503 @@ contract FractalLaunchpadTest is Test {
         assertEq(launchpad.platformFee(), _fee);
 
         vm.stopPrank();
+    }
+
+    // ============ Implementation Update Tests ============
+
+    function test_UpdateERC721Implementation_Success() public {
+        vm.startPrank(owner);
+
+        FractalERC721Impl newImpl = new FractalERC721Impl();
+        address oldImpl = launchpad.erc721Implementation();
+
+        launchpad.updateERC721Implementation(address(newImpl));
+
+        assertEq(launchpad.erc721Implementation(), address(newImpl));
+        assertTrue(launchpad.erc721Implementation() != oldImpl);
+
+        vm.stopPrank();
+    }
+
+    function test_UpdateERC1155Implementation_Success() public {
+        vm.startPrank(owner);
+
+        FractalERC1155Impl newImpl = new FractalERC1155Impl();
+        address oldImpl = launchpad.erc1155Implementation();
+
+        launchpad.updateERC1155Implementation(address(newImpl));
+
+        assertEq(launchpad.erc1155Implementation(), address(newImpl));
+        assertTrue(launchpad.erc1155Implementation() != oldImpl);
+
+        vm.stopPrank();
+    }
+
+    function test_UpdateERC721Implementation_RevertIf_ZeroAddress() public {
+        vm.startPrank(owner);
+
+        vm.expectRevert(FractalLaunchpad.InvalidERC721Implementation.selector);
+        launchpad.updateERC721Implementation(address(0));
+
+        vm.stopPrank();
+    }
+
+    function test_UpdateERC1155Implementation_RevertIf_ZeroAddress() public {
+        vm.startPrank(owner);
+
+        vm.expectRevert(FractalLaunchpad.InvalidERC1155Implementation.selector);
+        launchpad.updateERC1155Implementation(address(0));
+
+        vm.stopPrank();
+    }
+
+    function test_UpdateERC721Implementation_RevertIf_NotOwner() public {
+        FractalERC721Impl newImpl = new FractalERC721Impl();
+
+        vm.startPrank(unauthorized);
+
+        vm.expectRevert();
+        launchpad.updateERC721Implementation(address(newImpl));
+
+        vm.stopPrank();
+    }
+
+    function test_UpdateERC1155Implementation_RevertIf_NotOwner() public {
+        FractalERC1155Impl newImpl = new FractalERC1155Impl();
+
+        vm.startPrank(unauthorized);
+
+        vm.expectRevert();
+        launchpad.updateERC1155Implementation(address(newImpl));
+
+        vm.stopPrank();
+    }
+
+    function test_UpdateERC721Implementation_EmitsEvent() public {
+        vm.startPrank(owner);
+
+        FractalERC721Impl newImpl = new FractalERC721Impl();
+        address oldImpl = launchpad.erc721Implementation();
+
+        vm.expectEmit(true, true, false, false);
+        emit FractalLaunchpad.ERC721ImplementationUpdated(oldImpl, address(newImpl));
+
+        launchpad.updateERC721Implementation(address(newImpl));
+
+        vm.stopPrank();
+    }
+
+    function test_UpdateERC1155Implementation_EmitsEvent() public {
+        vm.startPrank(owner);
+
+        FractalERC1155Impl newImpl = new FractalERC1155Impl();
+        address oldImpl = launchpad.erc1155Implementation();
+
+        vm.expectEmit(true, true, false, false);
+        emit FractalLaunchpad.ERC1155ImplementationUpdated(oldImpl, address(newImpl));
+
+        launchpad.updateERC1155Implementation(address(newImpl));
+
+        vm.stopPrank();
+    }
+
+    function test_UpdateERC721Implementation_DoesNotAffectExistingClones() public {
+        // 1. Create a clone with the original implementation
+        vm.prank(creator);
+        uint256 launchId = launchpad.createLaunch{value: PLATFORM_FEE}(
+            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.COMMERCIAL, FractalLaunchpad.TokenType.ERC721
+        );
+
+        FractalLaunchpad.LaunchConfig memory config = launchpad.getLaunchInfo(launchId);
+        FractalERC721Impl existingClone = FractalERC721Impl(config.tokenContract);
+
+        // 2. Mint a token on the existing clone
+        vm.prank(creator);
+        existingClone.mint(user, 1);
+        assertEq(existingClone.ownerOf(1), user);
+
+        // 3. Update the implementation
+        vm.startPrank(owner);
+        FractalERC721Impl newImpl = new FractalERC721Impl();
+        launchpad.updateERC721Implementation(address(newImpl));
+        vm.stopPrank();
+
+        // 4. Existing clone should still work perfectly
+        vm.startPrank(creator);
+        existingClone.mint(user, 2);
+        assertEq(existingClone.ownerOf(2), user);
+        assertEq(existingClone.totalSupply(), 2);
+        assertEq(existingClone.name(), NAME);
+        assertEq(existingClone.symbol(), SYMBOL);
+        vm.stopPrank();
+    }
+
+    function test_UpdateERC1155Implementation_DoesNotAffectExistingClones() public {
+        // 1. Create a clone with the original implementation
+        vm.prank(creator);
+        uint256 launchId = launchpad.createLaunch{value: PLATFORM_FEE}(
+            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.PUBLIC, FractalLaunchpad.TokenType.ERC1155
+        );
+
+        FractalLaunchpad.LaunchConfig memory config = launchpad.getLaunchInfo(launchId);
+        FractalERC1155Impl existingClone = FractalERC1155Impl(config.tokenContract);
+
+        // 2. Mint tokens on the existing clone
+        vm.prank(creator);
+        existingClone.mint(user, 0, 50, "");
+        assertEq(existingClone.balanceOf(user, 0), 50);
+
+        // 3. Update the implementation
+        vm.startPrank(owner);
+        FractalERC1155Impl newImpl = new FractalERC1155Impl();
+        launchpad.updateERC1155Implementation(address(newImpl));
+        vm.stopPrank();
+
+        // 4. Existing clone should still work perfectly
+        vm.startPrank(creator);
+        existingClone.mint(user, 0, 25, "");
+        assertEq(existingClone.balanceOf(user, 0), 75);
+        assertEq(existingClone.totalSupply(0), 75);
+        assertEq(existingClone.name(), NAME);
+        vm.stopPrank();
+    }
+
+    function test_NewClonesUseUpdatedImplementation() public {
+        // 1. Create clone with original implementation
+        vm.prank(creator);
+        uint256 launchId1 = launchpad.createLaunch{value: PLATFORM_FEE}(
+            "Old ERC1155", "OLD", MAX_SUPPLY, "https://old.com/", ROYALTY_FEE,
+            LicenseVersion.PUBLIC, FractalLaunchpad.TokenType.ERC1155
+        );
+
+        FractalLaunchpad.LaunchConfig memory config1 = launchpad.getLaunchInfo(launchId1);
+        address oldClone = config1.tokenContract;
+
+        // 2. Deploy a new implementation and update
+        vm.startPrank(owner);
+        FractalERC1155Impl newImpl = new FractalERC1155Impl();
+        launchpad.updateERC1155Implementation(address(newImpl));
+        vm.stopPrank();
+
+        // 3. Create a new clone — should use the new implementation
+        vm.prank(creator);
+        uint256 launchId2 = launchpad.createLaunch{value: PLATFORM_FEE}(
+            "New ERC1155", "NEW", MAX_SUPPLY, "https://new.com/", ROYALTY_FEE,
+            LicenseVersion.PUBLIC, FractalLaunchpad.TokenType.ERC1155
+        );
+
+        FractalLaunchpad.LaunchConfig memory config2 = launchpad.getLaunchInfo(launchId2);
+        address newClone = config2.tokenContract;
+
+        // 4. Both clones should be functional
+        assertTrue(oldClone != newClone);
+
+        FractalERC1155Impl oldContract = FractalERC1155Impl(oldClone);
+        FractalERC1155Impl newContract = FractalERC1155Impl(newClone);
+
+        assertEq(oldContract.name(), "Old ERC1155");
+        assertEq(newContract.name(), "New ERC1155");
+
+        // 5. Both should be mintable
+        vm.startPrank(creator);
+        oldContract.mint(user, 0, 10, "");
+        newContract.mint(user, 0, 10, "");
+        vm.stopPrank();
+
+        assertEq(oldContract.balanceOf(user, 0), 10);
+        assertEq(newContract.balanceOf(user, 0), 10);
+    }
+
+    function test_UpdateImplementation_MultipleTimesInSequence() public {
+        vm.startPrank(owner);
+
+        address original = launchpad.erc1155Implementation();
+
+        // Update 3 times
+        FractalERC1155Impl impl1 = new FractalERC1155Impl();
+        launchpad.updateERC1155Implementation(address(impl1));
+        assertEq(launchpad.erc1155Implementation(), address(impl1));
+
+        FractalERC1155Impl impl2 = new FractalERC1155Impl();
+        launchpad.updateERC1155Implementation(address(impl2));
+        assertEq(launchpad.erc1155Implementation(), address(impl2));
+
+        FractalERC1155Impl impl3 = new FractalERC1155Impl();
+        launchpad.updateERC1155Implementation(address(impl3));
+        assertEq(launchpad.erc1155Implementation(), address(impl3));
+
+        // Should be on the 3rd implementation, none of the previous ones
+        assertTrue(launchpad.erc1155Implementation() != original);
+        assertTrue(launchpad.erc1155Implementation() != address(impl1));
+        assertTrue(launchpad.erc1155Implementation() != address(impl2));
+
+        vm.stopPrank();
+    }
+
+    function test_UpdateERC721Implementation_CanSetBackToOriginal() public {
+        address original = launchpad.erc721Implementation();
+
+        vm.startPrank(owner);
+
+        FractalERC721Impl newImpl = new FractalERC721Impl();
+        launchpad.updateERC721Implementation(address(newImpl));
+        assertEq(launchpad.erc721Implementation(), address(newImpl));
+
+        // Set it back to the original
+        launchpad.updateERC721Implementation(original);
+        assertEq(launchpad.erc721Implementation(), original);
+
+        vm.stopPrank();
+    }
+
+    function test_IsClone_AfterImplementationUpdate() public {
+        // 1. Create a clone with old implementation
+        vm.prank(creator);
+        uint256 launchId1 = launchpad.createLaunch{value: PLATFORM_FEE}(
+            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.PUBLIC, FractalLaunchpad.TokenType.ERC1155
+        );
+        FractalLaunchpad.LaunchConfig memory config1 = launchpad.getLaunchInfo(launchId1);
+        address oldClone = config1.tokenContract;
+
+        // Old clone IS a clone of the current implementation
+        assertTrue(launchpad.isERC1155Clone(oldClone));
+
+        // 2. Update the implementation
+        vm.startPrank(owner);
+        FractalERC1155Impl newImpl = new FractalERC1155Impl();
+        launchpad.updateERC1155Implementation(address(newImpl));
+        vm.stopPrank();
+
+        // 3. Old clone is NO LONGER detected as a clone of the NEW implementation
+        //    This is expected behavior — isClone checks against the current implementation
+        assertFalse(launchpad.isERC1155Clone(oldClone));
+
+        // 4. Create a new clone with the new implementation
+        vm.prank(creator);
+        uint256 launchId2 = launchpad.createLaunch{value: PLATFORM_FEE}(
+            "New", "NEW", MAX_SUPPLY, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.PUBLIC, FractalLaunchpad.TokenType.ERC1155
+        );
+        FractalLaunchpad.LaunchConfig memory config2 = launchpad.getLaunchInfo(launchId2);
+        address newClone = config2.tokenContract;
+
+        // New clone IS detected as a clone of the new implementation
+        assertTrue(launchpad.isERC1155Clone(newClone));
+    }
+
+    // ============ ERC1155 URI Fix Tests ============
+
+    function test_ERC1155_URI_AppendsTokenId() public {
+        vm.startPrank(creator);
+
+        uint256 launchId = launchpad.createLaunch{value: PLATFORM_FEE}(
+            NAME, SYMBOL, MAX_SUPPLY, "ipfs://QmTestHash/", ROYALTY_FEE,
+            LicenseVersion.PUBLIC, FractalLaunchpad.TokenType.ERC1155
+        );
+
+        FractalLaunchpad.LaunchConfig memory config = launchpad.getLaunchInfo(launchId);
+        FractalERC1155Impl nftContract = FractalERC1155Impl(config.tokenContract);
+
+        // uri should append the token ID to the base URI
+        assertEq(nftContract.uri(0), "ipfs://QmTestHash/0");
+        assertEq(nftContract.uri(1), "ipfs://QmTestHash/1");
+        assertEq(nftContract.uri(42), "ipfs://QmTestHash/42");
+        assertEq(nftContract.uri(999), "ipfs://QmTestHash/999");
+
+        vm.stopPrank();
+    }
+
+    function test_ERC1155_URI_CustomOverridesBaseWithTokenId() public {
+        vm.startPrank(creator);
+
+        uint256 launchId = launchpad.createLaunch{value: PLATFORM_FEE}(
+            NAME, SYMBOL, MAX_SUPPLY, "ipfs://QmTestHash/", ROYALTY_FEE,
+            LicenseVersion.PUBLIC, FractalLaunchpad.TokenType.ERC1155
+        );
+
+        FractalLaunchpad.LaunchConfig memory config = launchpad.getLaunchInfo(launchId);
+        FractalERC1155Impl nftContract = FractalERC1155Impl(config.tokenContract);
+
+        // Set a custom URI for token 1
+        string memory customURI = "ipfs://QmCustomHash/special";
+        nftContract.setTokenURI(1, customURI);
+
+        // Token 1 should return custom URI (not base + id)
+        assertEq(nftContract.uri(1), customURI);
+
+        // Other tokens should still return base + id
+        assertEq(nftContract.uri(0), "ipfs://QmTestHash/0");
+        assertEq(nftContract.uri(2), "ipfs://QmTestHash/2");
+
+        vm.stopPrank();
+    }
+
+    function test_ERC1155_URI_EmptyBaseReturnsEmpty() public {
+        vm.startPrank(creator);
+
+        uint256 launchId = launchpad.createLaunch{value: PLATFORM_FEE}(
+            NAME, SYMBOL, MAX_SUPPLY, "", ROYALTY_FEE,
+            LicenseVersion.PUBLIC, FractalLaunchpad.TokenType.ERC1155
+        );
+
+        FractalLaunchpad.LaunchConfig memory config = launchpad.getLaunchInfo(launchId);
+        FractalERC1155Impl nftContract = FractalERC1155Impl(config.tokenContract);
+
+        // Empty base URI should return empty string
+        assertEq(nftContract.uri(0), "");
+        assertEq(nftContract.uri(1), "");
+
+        // But custom URI should still work
+        nftContract.setTokenURI(1, "ipfs://QmCustom/1");
+        assertEq(nftContract.uri(1), "ipfs://QmCustom/1");
+        assertEq(nftContract.uri(0), ""); // Still empty for non-custom
+
+        vm.stopPrank();
+    }
+
+    function testFuzz_ERC1155_URI_AppendsAnyTokenId(uint256 tokenId) public {
+        vm.startPrank(creator);
+
+        uint256 launchId = launchpad.createLaunch{value: PLATFORM_FEE}(
+            NAME, SYMBOL, MAX_SUPPLY, "https://api.example.com/token/", ROYALTY_FEE,
+            LicenseVersion.PUBLIC, FractalLaunchpad.TokenType.ERC1155
+        );
+
+        FractalLaunchpad.LaunchConfig memory config = launchpad.getLaunchInfo(launchId);
+        FractalERC1155Impl nftContract = FractalERC1155Impl(config.tokenContract);
+
+        string memory expected = string.concat("https://api.example.com/token/", vm.toString(tokenId));
+        assertEq(nftContract.uri(tokenId), expected);
+
+        vm.stopPrank();
+    }
+
+    // ============ End-to-End Implementation Upgrade Scenario ============
+
+    function test_E2E_UpgradeImplementationAndCreateNewClones() public {
+        // Simulates the real-world scenario: fix a bug in implementation, update launchpad, deploy new clones
+
+        // 1. Create a clone with the original implementation
+        vm.prank(creator);
+        uint256 launchId1 = launchpad.createLaunch{value: PLATFORM_FEE}(
+            "Original Collection", "ORIG", 100, "ipfs://QmOriginal/", ROYALTY_FEE,
+            LicenseVersion.PUBLIC, FractalLaunchpad.TokenType.ERC1155
+        );
+
+        FractalLaunchpad.LaunchConfig memory config1 = launchpad.getLaunchInfo(launchId1);
+        FractalERC1155Impl originalClone = FractalERC1155Impl(config1.tokenContract);
+
+        // 2. Mint on the original clone
+        vm.prank(creator);
+        originalClone.mint(user, 0, 5, "");
+        assertEq(originalClone.balanceOf(user, 0), 5);
+
+        // 3. Owner deploys a new (fixed) implementation and updates
+        vm.startPrank(owner);
+        FractalERC1155Impl fixedImpl = new FractalERC1155Impl();
+        launchpad.updateERC1155Implementation(address(fixedImpl));
+        vm.stopPrank();
+
+        // 4. Create a new clone — uses the fixed implementation
+        vm.prank(creator);
+        uint256 launchId2 = launchpad.createLaunch{value: PLATFORM_FEE}(
+            "Fixed Collection", "FIX", 200, "ipfs://QmFixed/", ROYALTY_FEE,
+            LicenseVersion.COMMERCIAL, FractalLaunchpad.TokenType.ERC1155
+        );
+
+        FractalLaunchpad.LaunchConfig memory config2 = launchpad.getLaunchInfo(launchId2);
+        FractalERC1155Impl fixedClone = FractalERC1155Impl(config2.tokenContract);
+
+        // 5. Both clones work independently
+        vm.startPrank(creator);
+        originalClone.mint(user, 0, 3, "");
+        fixedClone.mint(user, 0, 10, "");
+        vm.stopPrank();
+
+        assertEq(originalClone.balanceOf(user, 0), 8);
+        assertEq(fixedClone.balanceOf(user, 0), 10);
+
+        // 6. URI fix works on the new clone
+        assertEq(fixedClone.uri(0), "ipfs://QmFixed/0");
+        assertEq(fixedClone.uri(1), "ipfs://QmFixed/1");
+
+        // 7. Verify correct tracking
+        address[] memory creatorERC1155s = launchpad.getERC1155sByCreator(creator);
+        assertEq(creatorERC1155s.length, 2);
+        assertEq(creatorERC1155s[0], address(originalClone));
+        assertEq(creatorERC1155s[1], address(fixedClone));
+
+        // 8. Launch IDs are sequential
+        assertEq(launchpad.nextLaunchId(), 2);
+    }
+
+    function test_E2E_UpdateBothImplementationsSimultaneously() public {
+        vm.startPrank(owner);
+
+        FractalERC721Impl newERC721 = new FractalERC721Impl();
+        FractalERC1155Impl newERC1155 = new FractalERC1155Impl();
+
+        launchpad.updateERC721Implementation(address(newERC721));
+        launchpad.updateERC1155Implementation(address(newERC1155));
+
+        vm.stopPrank();
+
+        assertEq(launchpad.erc721Implementation(), address(newERC721));
+        assertEq(launchpad.erc1155Implementation(), address(newERC1155));
+
+        // Create launches with both new implementations
+        vm.startPrank(creator);
+
+        uint256 erc721LaunchId = launchpad.createLaunch{value: PLATFORM_FEE}(
+            "New 721", "N721", 100, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.COMMERCIAL, FractalLaunchpad.TokenType.ERC721
+        );
+
+        uint256 erc1155LaunchId = launchpad.createLaunch{value: PLATFORM_FEE}(
+            "New 1155", "N1155", 100, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.PUBLIC, FractalLaunchpad.TokenType.ERC1155
+        );
+
+        vm.stopPrank();
+
+        FractalLaunchpad.LaunchConfig memory config721 = launchpad.getLaunchInfo(erc721LaunchId);
+        FractalLaunchpad.LaunchConfig memory config1155 = launchpad.getLaunchInfo(erc1155LaunchId);
+
+        // Both new clones should be functional
+        FractalERC721Impl nft721 = FractalERC721Impl(config721.tokenContract);
+        FractalERC1155Impl nft1155 = FractalERC1155Impl(config1155.tokenContract);
+
+        vm.startPrank(creator);
+        nft721.mint(user, 1);
+        nft1155.mint(user, 0, 5, "");
+        vm.stopPrank();
+
+        assertEq(nft721.ownerOf(1), user);
+        assertEq(nft1155.balanceOf(user, 0), 5);
+
+        // isClone should work with new implementations
+        assertTrue(launchpad.isERC721Clone(config721.tokenContract));
+        assertTrue(launchpad.isERC1155Clone(config1155.tokenContract));
+    }
+
+    // ============ Fuzz Tests for Implementation Updates ============
+
+    function testFuzz_UpdateERC721Implementation(address _newImpl) public {
+        vm.assume(_newImpl != address(0));
+
+        vm.prank(owner);
+        launchpad.updateERC721Implementation(_newImpl);
+        assertEq(launchpad.erc721Implementation(), _newImpl);
+    }
+
+    function testFuzz_UpdateERC1155Implementation(address _newImpl) public {
+        vm.assume(_newImpl != address(0));
+
+        vm.prank(owner);
+        launchpad.updateERC1155Implementation(_newImpl);
+        assertEq(launchpad.erc1155Implementation(), _newImpl);
     }
 }

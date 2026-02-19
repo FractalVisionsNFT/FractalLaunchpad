@@ -5,6 +5,7 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {ERC1155Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ERC2981} from "@openzeppelin/contracts/token/common/ERC2981.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {CantBeEvilUpgradeable, LicenseVersion} from "./a16z/CantBeEvilUpgradeable.sol";
 
 contract FractalERC1155Impl is
@@ -101,7 +102,11 @@ contract FractalERC1155Impl is
     }
 
     function uri(uint256 _id) public view override returns (string memory) {
-        return bytes(tokenURIs[_id]).length > 0 ? tokenURIs[_id] : super.uri(_id);
+        if (bytes(tokenURIs[_id]).length > 0) {
+            return tokenURIs[_id];
+        }
+        string memory baseURI = super.uri(_id);
+        return bytes(baseURI).length > 0 ? string.concat(baseURI, Strings.toString(_id)) : "";
     }
 
     function burn(address _from, uint256 _id, uint256 _amount) external {

@@ -115,7 +115,7 @@ contract FractalERC1155UpgradeableTest is Test {
         assertEq(proxy.name(), NAME);
         assertEq(proxy.symbol(), SYMBOL);
         assertEq(proxy.maxSupply(0), MAX_SUPPLY); // Token ID 0 has max supply
-        assertEq(proxy.uri(0), BASE_URI);
+        assertEq(proxy.uri(0), string.concat(BASE_URI, "0"));
         assertEq(proxy.owner(), owner);
         assertEq(proxy.totalSupply(0), 0);
 

@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
 import {FractalLaunchpad} from "../src/FractalLaunchpad.sol";
-import {MinimalProxy} from "../src/Factory.sol";
+import {ProxyFactory} from "../src/Factory.sol";
 import {FractalERC721Impl} from "../src/FractalERC721.sol";
 import {FractalERC1155Impl} from "../src/FractalERC1155.sol";
 
@@ -25,8 +25,8 @@ contract FractalLaunchpadScript is Script {
         console.log("ERC1155 Implementation deployed at:", address(erc1155Implementation));
 
         // 2. Deploy factory
-        console.log("Deploying MinimalProxy Factory...");
-        MinimalProxy factory = new MinimalProxy();
+        console.log("Deploying ProxyFactory...");
+        ProxyFactory factory = new ProxyFactory();
         console.log("Factory deployed at:", address(factory));
 
         // 3. Deploy launchpad
