@@ -6,6 +6,9 @@ import {LicenseVersion, FractalERC1155Impl} from "../src/FractalERC1155.sol";
 import {ICantBeEvil} from "@a16z/contracts/licenses/ICantBeEvil.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {FractalLaunchpad} from "../src/FractalLaunchpad.sol";
+import {ProxyFactory} from "../src/Factory.sol";
+import {FractalERC721Impl} from "../src/FractalERC721.sol";
 
 
 // Mock upgraded version for testing
@@ -56,13 +59,17 @@ contract MaliciousFractalERC1155 is FractalERC1155Impl {
 contract FractalERC1155UpgradeableTest is Test {
     FractalERC1155Impl public implementation;
     FractalERC1155Impl public proxy;
+    FractalLaunchpad public launchpad;
+    ProxyFactory public factory;
+    FractalERC721Impl public erc721Implementation;
 
     address public owner;
     address public user1;
     address public user2;
     address public user3;
     address public unauthorized;
-    address public proxyAdmin;
+    address public deployer;
+    address public feeRecipient;
 
     string public constant NAME = "Upgradeable 1155";
     string public constant SYMBOL = "U1155";
@@ -84,28 +91,30 @@ contract FractalERC1155UpgradeableTest is Test {
         user2 = makeAddr("user2");
         user3 = makeAddr("user3");
         unauthorized = makeAddr("unauthorized");
-        proxyAdmin = makeAddr("proxyAdmin");
+        deployer = makeAddr("deployer");
+        feeRecipient = makeAddr("feeRecipient");
 
-        // Deploy implementation
+        // Deploy infrastructure as deployer (mirrors real mainnet deployment)
+        vm.startPrank(deployer);
         implementation = new FractalERC1155Impl();
-
-        // Prepare initialization data
-        bytes memory initData = abi.encodeWithSelector(
-            FractalERC1155Impl.initialize.selector,
-            NAME,
-            SYMBOL,
-            MAX_SUPPLY,
-            BASE_URI,
-            owner,
-            ROYALTY_FEE,
-            LicenseVersion.COMMERCIAL
+        erc721Implementation = new FractalERC721Impl();
+        factory = new ProxyFactory();
+        launchpad = new FractalLaunchpad(
+            feeRecipient, 0, address(implementation), address(erc721Implementation), address(factory)
         );
+        factory.grantRole(factory.CREATOR_ROLE(), address(launchpad));
+        vm.stopPrank();
 
-        // Deploy proxy
-        ERC1967Proxy proxyContract = new ERC1967Proxy(address(implementation), initData);
+        // Create proxy through the real Launchpad -> Factory -> ERC1967Proxy flow
+        vm.startPrank(owner);
+        uint256 launchId = launchpad.createLaunch(
+            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.COMMERCIAL, FractalLaunchpad.TokenType.ERC1155
+        );
+        vm.stopPrank();
 
-        // Cast proxy to implementation interface
-        proxy = FractalERC1155Impl(address(proxyContract));
+        FractalLaunchpad.LaunchConfig memory config = launchpad.getLaunchInfo(launchId);
+        proxy = FractalERC1155Impl(config.tokenContract);
     }
 
     // ============ Proxy Deployment Tests ============

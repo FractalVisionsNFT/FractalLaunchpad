@@ -6,6 +6,13 @@ import {FractalLaunchpad} from "../src/FractalLaunchpad.sol";
 import {ProxyFactory} from "../src/Factory.sol";
 import {FractalERC721Impl} from "../src/FractalERC721.sol";
 import {LicenseVersion, FractalERC1155Impl} from "../src/FractalERC1155.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+contract RevertOnReceive {
+    receive() external payable {
+        revert("no receive");
+    }
+}
 
 contract FractalLaunchpadTest is Test {
     FractalLaunchpad public launchpad;
@@ -1173,5 +1180,204 @@ contract FractalLaunchpadTest is Test {
         vm.prank(owner);
         launchpad.updateERC1155Implementation(_newImpl);
         assertEq(launchpad.erc1155Implementation(), _newImpl);
+    }
+
+    // ============ Event Tests ============
+
+    function test_CreateLaunch_EmitsLaunchCreatedEvent_ERC721() public {
+        vm.startPrank(creator);
+
+        vm.expectEmit(true, false, true, false);
+        emit LaunchCreated(0, FractalLaunchpad.TokenType.ERC721, address(0), creator);
+
+        launchpad.createLaunch{value: PLATFORM_FEE}(
+            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.COMMERCIAL, FractalLaunchpad.TokenType.ERC721
+        );
+
+        vm.stopPrank();
+    }
+
+    function test_CreateLaunch_EmitsLaunchCreatedEvent_ERC1155() public {
+        vm.startPrank(creator);
+
+        vm.expectEmit(true, false, true, false);
+        emit LaunchCreated(0, FractalLaunchpad.TokenType.ERC1155, address(0), creator);
+
+        launchpad.createLaunch{value: PLATFORM_FEE}(
+            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.PUBLIC, FractalLaunchpad.TokenType.ERC1155
+        );
+
+        vm.stopPrank();
+    }
+
+    // ============ Fee Edge Cases ============
+
+    function test_CreateLaunch_ExcessETH_StaysInContract() public {
+        uint256 excessAmount = 1 ether;
+
+        vm.startPrank(creator);
+        launchpad.createLaunch{value: PLATFORM_FEE + excessAmount}(
+            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.COMMERCIAL, FractalLaunchpad.TokenType.ERC721
+        );
+        vm.stopPrank();
+
+        assertEq(address(launchpad).balance, excessAmount);
+    }
+
+    function test_CreateLaunch_RevertIf_FailedToSendFee() public {
+        RevertOnReceive revertingRecipient = new RevertOnReceive();
+
+        vm.prank(owner);
+        launchpad.setFeeRecipient(address(revertingRecipient));
+
+        vm.startPrank(creator);
+        vm.expectRevert(FractalLaunchpad.FailedToSendFee.selector);
+        launchpad.createLaunch{value: PLATFORM_FEE}(
+            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.COMMERCIAL, FractalLaunchpad.TokenType.ERC721
+        );
+        vm.stopPrank();
+    }
+
+    function test_SetPlatformFee_ToZero_AnyoneCanCreate() public {
+        vm.prank(owner);
+        launchpad.setPlatformFee(0);
+
+        vm.startPrank(unauthorized);
+        uint256 launchId = launchpad.createLaunch(
+            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.COMMERCIAL, FractalLaunchpad.TokenType.ERC721
+        );
+        vm.stopPrank();
+
+        FractalLaunchpad.LaunchConfig memory config = launchpad.getLaunchInfo(launchId);
+        assertTrue(config.tokenContract != address(0));
+    }
+
+    function test_CreateLaunch_RevertIf_FactoryRoleRevoked() public {
+        bytes32 role = factory.CREATOR_ROLE();
+
+        vm.prank(owner);
+        factory.revokeRole(role, address(launchpad));
+
+        vm.startPrank(creator);
+        vm.expectRevert();
+        launchpad.createLaunch{value: PLATFORM_FEE}(
+            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.COMMERCIAL, FractalLaunchpad.TokenType.ERC721
+        );
+        vm.stopPrank();
+    }
+
+    // ============ Ownership Tests ============
+
+    function test_TransferOwnership() public {
+        address newOwner = makeAddr("newOwner");
+
+        vm.prank(owner);
+        launchpad.transferOwnership(newOwner);
+
+        assertEq(launchpad.owner(), newOwner);
+    }
+
+    function test_TransferOwnership_RevertIf_NotOwner() public {
+        vm.prank(unauthorized);
+        vm.expectRevert();
+        launchpad.transferOwnership(unauthorized);
+    }
+
+    // ============ UUPS Upgrade Through Factory Flow ============
+
+    function test_UpgradeERC1155_ThroughFactoryCreatedProxy() public {
+        vm.startPrank(creator);
+        uint256 launchId = launchpad.createLaunch{value: PLATFORM_FEE}(
+            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.PUBLIC, FractalLaunchpad.TokenType.ERC1155
+        );
+        vm.stopPrank();
+
+        FractalLaunchpad.LaunchConfig memory config = launchpad.getLaunchInfo(launchId);
+        FractalERC1155Impl nftProxy = FractalERC1155Impl(config.tokenContract);
+
+        // Mint some tokens
+        vm.prank(creator);
+        nftProxy.mint(user, 0, 50, "");
+        assertEq(nftProxy.balanceOf(user, 0), 50);
+
+        // Creator (proxy owner) upgrades the proxy
+        FractalERC1155Impl newImpl = new FractalERC1155Impl();
+
+        vm.prank(creator);
+        UUPSUpgradeable(config.tokenContract).upgradeToAndCall(address(newImpl), "");
+
+        // State preserved after upgrade
+        assertEq(nftProxy.balanceOf(user, 0), 50);
+        assertEq(nftProxy.name(), NAME);
+        assertEq(nftProxy.owner(), creator);
+    }
+
+    function test_UpgradeERC721_ThroughFactoryCreatedProxy() public {
+        vm.startPrank(creator);
+        uint256 launchId = launchpad.createLaunch{value: PLATFORM_FEE}(
+            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.COMMERCIAL, FractalLaunchpad.TokenType.ERC721
+        );
+        vm.stopPrank();
+
+        FractalLaunchpad.LaunchConfig memory config = launchpad.getLaunchInfo(launchId);
+        FractalERC721Impl nftProxy = FractalERC721Impl(config.tokenContract);
+
+        // Mint a token
+        vm.prank(creator);
+        nftProxy.mint(user, 1);
+        assertEq(nftProxy.ownerOf(1), user);
+
+        // Creator (proxy owner) upgrades the proxy
+        FractalERC721Impl newImpl = new FractalERC721Impl();
+
+        vm.prank(creator);
+        UUPSUpgradeable(config.tokenContract).upgradeToAndCall(address(newImpl), "");
+
+        // State preserved after upgrade
+        assertEq(nftProxy.ownerOf(1), user);
+        assertEq(nftProxy.name(), NAME);
+        assertEq(nftProxy.owner(), creator);
+    }
+
+    function test_UpgradeERC1155_RevertIf_NotOwner_ThroughFactory() public {
+        vm.startPrank(creator);
+        uint256 launchId = launchpad.createLaunch{value: PLATFORM_FEE}(
+            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.PUBLIC, FractalLaunchpad.TokenType.ERC1155
+        );
+        vm.stopPrank();
+
+        FractalLaunchpad.LaunchConfig memory config = launchpad.getLaunchInfo(launchId);
+        FractalERC1155Impl newImpl = new FractalERC1155Impl();
+
+        // Non-owner cannot upgrade
+        vm.prank(unauthorized);
+        vm.expectRevert();
+        UUPSUpgradeable(config.tokenContract).upgradeToAndCall(address(newImpl), "");
+    }
+
+    function test_UpgradeERC721_RevertIf_NotOwner_ThroughFactory() public {
+        vm.startPrank(creator);
+        uint256 launchId = launchpad.createLaunch{value: PLATFORM_FEE}(
+            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, ROYALTY_FEE,
+            LicenseVersion.COMMERCIAL, FractalLaunchpad.TokenType.ERC721
+        );
+        vm.stopPrank();
+
+        FractalLaunchpad.LaunchConfig memory config = launchpad.getLaunchInfo(launchId);
+        FractalERC721Impl newImpl = new FractalERC721Impl();
+
+        // Non-owner cannot upgrade
+        vm.prank(unauthorized);
+        vm.expectRevert();
+        UUPSUpgradeable(config.tokenContract).upgradeToAndCall(address(newImpl), "");
     }
 }

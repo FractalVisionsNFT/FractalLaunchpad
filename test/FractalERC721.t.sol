@@ -21,6 +21,8 @@ contract FractalERC721Test is Test {
 
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     event LicenseVersionSet(LicenseVersion indexed licenseVersion);
+    event MaxSupplySet(uint256 maxSupply);
+    event BaseURISet(string baseURI);
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -1003,5 +1005,31 @@ contract FractalERC721Test is Test {
 
         // Royalty should never exceed 100% of sale price
         assertTrue(royaltyAmount <= salePrice);
+    }
+
+    // ============ Event Tests ============
+
+    function test_SetMaxSupply_EmitsMaxSupplySetEvent() public {
+        vm.startPrank(owner);
+
+        vm.expectEmit(false, false, false, true);
+        emit MaxSupplySet(2000);
+
+        nft.setMaxSupply(2000);
+
+        vm.stopPrank();
+    }
+
+    function test_SetBaseURI_EmitsBaseURISetEvent() public {
+        vm.startPrank(owner);
+
+        string memory newBaseURI = "https://newuri.com/";
+
+        vm.expectEmit(false, false, false, true);
+        emit BaseURISet(newBaseURI);
+
+        nft.setBaseURI(newBaseURI);
+
+        vm.stopPrank();
     }
 }

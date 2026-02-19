@@ -26,6 +26,8 @@ contract FractalERC1155Test is Test {
     );
     event URI(string value, uint256 indexed id);
     event LicenseVersionSet(LicenseVersion indexed licenseVersion);
+    event MaxSupplySet(uint256 indexed tokenId, uint256 maxSupply);
+    event BaseURISet(string baseURI);
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -1445,5 +1447,100 @@ contract FractalERC1155Test is Test {
 
         // Royalty should never exceed 100% of sale price
         assertTrue(royaltyAmount <= salePrice);
+    }
+
+    // ============ Set Base URI Tests ============
+
+    function test_SetBaseURI_Success() public {
+        vm.startPrank(owner);
+
+        string memory newBaseURI = "ipfs://QmNewHash/";
+        nft.setBaseURI(newBaseURI);
+
+        assertEq(nft.uri(0), string.concat(newBaseURI, "0"));
+        assertEq(nft.uri(5), string.concat(newBaseURI, "5"));
+
+        vm.stopPrank();
+    }
+
+    function test_SetBaseURI_RevertIf_NotOwner() public {
+        vm.startPrank(unauthorized);
+
+        vm.expectRevert();
+        nft.setBaseURI("ipfs://hacked/");
+
+        vm.stopPrank();
+    }
+
+    function test_SetBaseURI_EmitsBaseURISetEvent() public {
+        vm.startPrank(owner);
+
+        string memory newBaseURI = "ipfs://QmNewHash/";
+
+        vm.expectEmit(false, false, false, true);
+        emit BaseURISet(newBaseURI);
+
+        nft.setBaseURI(newBaseURI);
+
+        vm.stopPrank();
+    }
+
+    function test_SetBaseURI_DoesNotAffectCustomTokenURIs() public {
+        vm.startPrank(owner);
+
+        nft.setTokenURI(1, "https://custom.com/1");
+        nft.setBaseURI("ipfs://QmNewBase/");
+
+        // Custom URI should remain
+        assertEq(nft.uri(1), "https://custom.com/1");
+
+        // Others use new base
+        assertEq(nft.uri(0), "ipfs://QmNewBase/0");
+        assertEq(nft.uri(2), "ipfs://QmNewBase/2");
+
+        vm.stopPrank();
+    }
+
+    function test_SetBaseURI_ToEmpty() public {
+        vm.startPrank(owner);
+
+        nft.setBaseURI("");
+
+        assertEq(nft.uri(0), "");
+        assertEq(nft.uri(5), "");
+
+        // Custom URIs should still work
+        nft.setTokenURI(1, "https://custom.com/1");
+        assertEq(nft.uri(1), "https://custom.com/1");
+
+        vm.stopPrank();
+    }
+
+    // ============ Standard URI Event Tests ============
+
+    function test_SetTokenURI_EmitsStandardURIEvent() public {
+        vm.startPrank(owner);
+
+        string memory tokenURI = "https://custom.com/token/1";
+
+        vm.expectEmit(true, true, true, true);
+        emit URI(tokenURI, 1);
+
+        nft.setTokenURI(1, tokenURI);
+
+        vm.stopPrank();
+    }
+
+    // ============ MaxSupplySet Event Test ============
+
+    function test_SetMaxSupply_EmitsMaxSupplySetEvent() public {
+        vm.startPrank(owner);
+
+        vm.expectEmit(true, false, false, true);
+        emit MaxSupplySet(1, 500);
+
+        nft.setMaxSupply(1, 500);
+
+        vm.stopPrank();
     }
 }
