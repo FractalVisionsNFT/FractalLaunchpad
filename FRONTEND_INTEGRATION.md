@@ -3,27 +3,11 @@
 This guide provides detailed information on how to interact with the FractalLaunchpad smart contracts from a frontend application.
 
 ## Table of Contents
-- [Contract Addresses](#contract-addresses)
 - [ABI Files](#abi-files)
 - [Core Workflows](#core-workflows)
 - [Function Reference](#function-reference)
 - [Events to Listen For](#events-to-listen-for)
 - [Error Handling](#error-handling)
-
----
-
-## Contract Addresses
-
-### Base Sepolia Testnet
-
-```javascript
-const CONTRACTS = {
-  LAUNCHPAD: "0x22797574900038d794234B4fBE0446288ee46c91",
-  ERC721_IMPLEMENTATION: "0x89Fbe4c8D8ff2679Bc97dE1140f7c6Ac01b9B1Ef",
-  ERC1155_IMPLEMENTATION: "0xEC151c90047aF420cF62f32840580Eb8764862b6",
-  FACTORY: "0xfB86636532Dec2F7e2006261Eda917d97D3E58c5"
-};
-```
 
 ---
 
@@ -38,6 +22,7 @@ The ABIs will be located in:
 - `out/FractalLaunchpad.sol/FractalLaunchpad.json`
 - `out/FractalERC721.sol/FractalERC721Impl.json`
 - `out/FractalERC1155.sol/FractalERC1155Impl.json`
+- `out/Factory.sol/ProxyFactory.json`
 
 ---
 
@@ -71,8 +56,6 @@ const TOKEN_TYPES = {
 
 #### Step 2: Create Your ERC721 Collection
 ```javascript
-
-   const LAUNCHPAD_ADDRESS = "0x22797574900038d794234B4fBE0446288ee46c91";
 
   const launchpad = new ethers.Contract(LAUNCHPAD_ADDRESS, LAUNCHPAD_ABI, signer);
   
@@ -155,7 +138,8 @@ const TOKEN_TYPES = {
 ```javascript
 // 1. Upload artwork for each token type
 // 2. For ERC1155, you can set custom URIs per token ID
-// 3. Base URI format: "ipfs://QmXXX/{id}.json" where {id} will be replaced
+// 3. Base URI with token ID appended: "ipfs://QmXXX/" → uri(1) returns "ipfs://QmXXX/1"
+// 4. Custom per-token URIs override the base URI
 ```
 
 #### Step 2: Create Your ERC1155 Collection
@@ -172,7 +156,7 @@ async function createERC1155Collection() {
     name: "My Gaming Items",
     symbol: "MGI",
     maxSupply: 0,                   // 0 for unlimited (applied to token ID 0 initially)
-    baseURI: "ipfs://YOUR_CID/{id}.json",
+    baseURI: "ipfs://YOUR_CID/",
     royaltyFee: 750,                // 7.5%
     licenseVersion: LICENSE_TYPES.COMMERCIAL,
     tokenType: TOKEN_TYPES.ERC1155
@@ -223,6 +207,9 @@ async function createERC1155Collection() {
   
   // Set custom URI for specific token ID
    erc1155.setTokenURI(1, "ipfs://CUSTOM_CID/special.json");
+  
+  // Update base URI for all tokens without custom URIs
+   erc1155.setBaseURI("ipfs://NEW_BASE_CID/");
   
   // Query token info
   erc1155.totalSupply(0);
@@ -308,14 +295,16 @@ const LICENSE_NAMES = {
 | 4 | `setFeeRecipient` | 0xe74b981b | address | Update fee recipient | No | Owner only |
 | 5 | `setPlatformFee` | 0x12e8e2c3 | uint256 | Update platform fee | No | Owner only |
 | 6 | `transferOwnership` | 0xf2fde38b | address | Transfer ownership | No | Owner only |
-| 7 | `withdrawLockedFunds` | 0x0f7624ae | - | Withdraw balance | No | Owner only |
+| 7 | `updateERC721Implementation` | 0x... | address | Update ERC721 implementation | No | Owner only |
+| 8 | `updateERC1155Implementation` | 0x... | address | Update ERC1155 implementation | No | Owner only |
+| 9 | `withdrawLockedFunds` | 0x0f7624ae | - | Withdraw balance | No | Owner only |
 
 #### Read Functions (No Transaction)
 
 | # | Function | Selector | Parameters | Returns | Description |
 |---|----------|----------|-----------|---------|-------------|
-| 1 | `ERC1155_IMPLEMENTATION` | 0xde7b604e | - | address | ERC1155 implementation address |
-| 2 | `ERC721_IMPLEMENTATION` | 0xed307d65 | - | address | ERC721 implementation address |
+| 1 | `ERC1155_IMPLEMENTATION` | 0xde7b604e | - | address | ERC1155 implementation address (mutable) |
+| 2 | `ERC721_IMPLEMENTATION` | 0xed307d65 | - | address | ERC721 implementation address (mutable) |
 | 3 | `allERC1155s` | 0x1ac4e43c | uint256 | address | All ERC1155 contracts by index |
 | 4 | `allERC721s` | 0xa0ebd2c7 | uint256 | address | All ERC721 contracts by index |
 | 5 | `authorizedCreators` | 0xc695502a | address | bool | Check if creator is authorized |
@@ -329,31 +318,37 @@ const LICENSE_NAMES = {
 | 13 | `isERC721Clone` | 0x6c633325 | address | bool | Check if ERC721 clone |
 | 14 | `launches` | 0x7b443a76 | uint256 | LaunchConfig | Launch config by ID |
 | 15 | `nextLaunchId` | 0x979bd9cc | - | uint256 | Next launch ID |
-| 16 | `nftFactory` | 0xd63843cd | - | address | MinimalProxy factory address |
+| 16 | `nftFactory` | 0xd63843cd | - | address | ProxyFactory address (immutable) |
 | 17 | `owner` | 0x8da5cb5b | - | address | Contract owner |
 | 18 | `platformFee` | 0x26232a2e | - | uint256 | Current platform fee |
 
-### MinimalProxy Factory Functions
+### ProxyFactory Functions
 
-The Factory contract is used internally by the Launchpad but can also be called directly for advanced use cases.
+The ProxyFactory contract uses OpenZeppelin AccessControl with a `CREATOR_ROLE`. It is used internally by the Launchpad but can also be called directly for advanced use cases.
 
 #### Write Functions (Require Transaction)
 
 | # | Function | Selector | Parameters | Description | Access |
 |---|----------|----------|-----------|-------------|--------|
-| 1 | `createClone` | 0xf50c48ab | address, string, string, uint256, string, address, uint96, uint8 | Create new minimal proxy clone | Anyone |
+| 1 | `createClone` | 0xf50c48ab | address, string, string, uint256, string, address, uint96, uint8 | Create new ERC1967 proxy clone | CREATOR_ROLE only |
+| 2 | `grantRole` | 0x2f2ff15d | bytes32, address | Grant a role to an account | DEFAULT_ADMIN_ROLE only |
+| 3 | `revokeRole` | 0xd547741f | bytes32, address | Revoke a role from an account | DEFAULT_ADMIN_ROLE only |
+| 4 | `renounceRole` | 0x36568abe | bytes32, address | Renounce a role | Role holder |
 
 #### Read Functions (No Transaction)
 
 | # | Function | Selector | Parameters | Returns | Description |
 |---|----------|----------|-----------|---------|-------------|
-| 1 | `allClonedContracts` | 0x6c61093f | uint256 | address | Get clone at index |
-| 2 | `deployerToContracts` | 0xbe9a3a36 | address, uint256 | address | Deployer's contract at index |
-| 3 | `getAllCreatedAddresses` | 0x6b1dc540 | - | address[] | All clone addresses |
-| 4 | `getAllProxiesByDeployer` | 0x2091186c | address | address[] | All clones by deployer |
-| 5 | `getCloneAddress` | 0x7a8f0786 | uint256 | address | Clone address at index |
-| 6 | `getCurrentIndex` | 0x0d9005ae | - | uint256 | Total clones created |
-| 7 | `isClone` | 0x43b66dac | address, address | bool | Check if clone of implementation |
+| 1 | `CREATOR_ROLE` | 0xe0ba5170 | - | bytes32 | Creator role identifier |
+| 2 | `DEFAULT_ADMIN_ROLE` | 0xa217fddf | - | bytes32 | Admin role identifier |
+| 3 | `allProxyContracts` | 0x... | uint256 | address | Get proxy at index |
+| 4 | `deployerToContracts` | 0xbe9a3a36 | address, uint256 | address | Deployer's contract at index |
+| 5 | `getAllCreatedAddresses` | 0x6b1dc540 | - | address[] | All proxy addresses |
+| 6 | `getAllProxiesByDeployer` | 0x2091186c | address | address[] | All proxies by deployer |
+| 7 | `getCloneAddress` | 0x7a8f0786 | uint256 | address | Proxy address at index |
+| 8 | `hasRole` | 0x91d14854 | bytes32, address | bool | Check if account has role |
+| 9 | `isClone` | 0x43b66dac | address, address | bool | Check if proxy of implementation |
+| 10 | `proxyToImplementation` | 0x... | address | address | Get implementation for proxy |
 
 
 
@@ -415,10 +410,11 @@ The Factory contract is used internally by the Launchpad but can also be called 
 | 7 | `safeBatchTransferFrom` | 0x2eb2c2d6 | address, address, uint256[], uint256[], bytes | Batch transfer safely | Owner or approved |
 | 8 | `safeTransferFrom` | 0xf242432a | address, address, uint256, uint256, bytes | Safe transfer tokens | Owner or approved |
 | 9 | `setApprovalForAll` | 0xa22cb465 | address, bool | Approve operator for all | Any holder |
-| 10 | `setMaxSupply` | 0x37da577c | uint256, uint256 | Set max supply for token ID | Owner only |
-| 11 | `setTokenURI` | 0x162094c4 | uint256, string | Set URI for token ID | Owner only |
-| 12 | `transferOwnership` | 0xf2fde38b | address | Transfer ownership | Owner only |
-| 13 | `upgradeToAndCall` | 0x4f1ef286 | address, bytes | Upgrade implementation | Owner only |
+| 10 | `setBaseURI` | 0x55f804b3 | string | Update base URI | Owner only |
+| 11 | `setMaxSupply` | 0x37da577c | uint256, uint256 | Set max supply for token ID | Owner only |
+| 12 | `setTokenURI` | 0x162094c4 | uint256, string | Set URI for token ID (emits standard URI event) | Owner only |
+| 13 | `transferOwnership` | 0xf2fde38b | address | Transfer ownership | Owner only |
+| 14 | `upgradeToAndCall` | 0x4f1ef286 | address, bytes | Upgrade implementation | Owner only |
 
 #### Read Functions (No Transaction)
 
@@ -439,14 +435,13 @@ The Factory contract is used internally by the Launchpad but can also be called 
 | 13 | `symbol` | 0x95d89b41 | - | string | Collection symbol |
 | 14 | `tokenURIs` | 0x6c8b703f | uint256 | string | Custom token URI mapping |
 | 15 | `totalSupply` | 0xbd85b039 | uint256 | uint256 | Total supply of token ID |
-| 16 | `uri` | 0x0e89341c | uint256 | string | Token URI (custom or base) |
+| 17 | `uri` | 0x0e89341c | uint256 | string | Token URI (custom or baseURI + tokenId) |
 
 ---
 
 ## Resources
 
 - **Blockscout Explorer**: https://base-sepolia.blockscout.com
-- **Base Sepolia Faucet**: https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet
 - **Ethers.js Docs**: https://docs.ethers.org/v6/
 - **ERC721 Standard**: https://eips.ethereum.org/EIPS/eip-721
 - **ERC1155 Standard**: https://eips.ethereum.org/EIPS/eip-1155

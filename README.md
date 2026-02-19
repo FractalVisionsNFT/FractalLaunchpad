@@ -9,8 +9,8 @@ FractalLaunchpad provides a robust, scalable platform for launching NFT collecti
 - **Multi-Token Support**: Deploy both ERC721 (unique) and ERC1155 (multi-supply) tokens
 - **Built-in Licensing**: Integrated a16z CantBeEvil license system with 6 configurable license types
 - **Upgrade Ready**: UUPS proxy pattern for seamless contract upgrades with state preservation
-- **Gas Optimized**: Minimal proxy pattern for cost-effective token deployment
-- **Security First**: Comprehensive access control, input validation, and upgradeability safeguards
+- **Gas Optimized**: ERC1967 proxy pattern for cost-effective token deployment
+- **Security First**: Comprehensive access control, role-based permissions, and upgradeability safeguards
 
 ## Architecture
 
@@ -19,11 +19,11 @@ The architecture diagram illustrates the complete system design:
 
 ```
 System Components:
-├── Core Protocol Layer (FractalLaunchpad, MinimalProxy Factory)
+├── Core Protocol Layer (FractalLaunchpad, ProxyFactory)
 ├── Token Implementation Layer (ERC721, ERC1155)
-├── Proxy Layer (Deployed Instances)
+├── Proxy Layer (ERC1967 Deployed Instances)
 ├── License Layer (CantBeEvil Integration)
-└── OpenZeppelin Foundation (ERC1967Proxy, UUPS, etc.)
+└── OpenZeppelin Foundation (ERC1967Proxy, UUPS, AccessControl, etc.)
 ```
 
 ## Technology Stack
@@ -121,17 +121,18 @@ $ cast --help
 FractalLaunchpad/
 ├── src/
 │   ├── FractalLaunchpad.sol         # Main launchpad contract
-│   ├── Factory.sol                  # MinimalProxy factory
+│   ├── Factory.sol                  # ERC1967 proxy factory
 │   ├── FractalERC721.sol           # ERC721 implementation
 │   ├── FractalERC1155.sol          # ERC1155 implementation
 │   └── a16z/
 │       └── CantBeEvilUpgradeable.sol # License integration
 ├── test/
-│   ├── FractalERC721.t.sol              # ERC721 core tests (57 tests)
-│   ├── FractalERC1155.t.sol             # ERC1155 core tests (77 tests)
+│   ├── FractalERC721.t.sol              # ERC721 core tests (59 tests)
+│   ├── FractalERC1155.t.sol             # ERC1155 core tests (84 tests)
 │   ├── FractalERC721Upgradeable.t.sol   # ERC721 upgrade tests (24 tests)
 │   ├── FractalERC1155Upgradeable.t.sol  # ERC1155 upgrade tests (23 tests)
-│   └── FractalLaunchad.t.sol            # Launchpad tests (34 tests)
+│   ├── FractalLaunchad.t.sol            # Launchpad tests (68 tests)
+│   └── Factory.t.sol                    # Factory tests (21 tests)
 ├── script/
 │   └── FractalLauncpad.s.sol        # Deployment script
 ├── lib/                             # Dependencies
@@ -164,7 +165,8 @@ FractalLaunchpad/
 ### Launchpad Protocol
 - Streamlined token creation with optional platform fees
 - Support for both ERC721 and ERC1155 tokens
-- Minimal proxy deployment for gas efficiency
+- ERC1967 proxy deployment via role-based ProxyFactory
+- Mutable implementation addresses for hot-swapping upgrades
 - Launch configuration storage
 - Event-based tracking
 
@@ -184,11 +186,12 @@ FractalLaunchpad/
 The project includes comprehensive test coverage:
 
 ### Test Breakdown by Suite:
-- **57 ERC721 Core Tests**: Standard operations, minting, burning, royalties, and licensing
-- **77 ERC1155 Core Tests**: Multi-token operations, batch minting, royalties, and licensing
+- **59 ERC721 Core Tests**: Standard operations, minting, burning, royalties, events, and licensing
+- **84 ERC1155 Core Tests**: Multi-token operations, batch minting, royalties, URI management, events, and licensing
 - **24 ERC721 Upgradeability Tests**: Upgrade scenarios, storage preservation, and state management
 - **23 ERC1155 Upgradeability Tests**: Multi-token upgrade testing and state consistency
-- **34 Launchpad Tests**: Platform deployment, fee management, and creator workflows
+- **68 Launchpad Tests**: Platform deployment, fee management, creator workflows, and UUPS upgrades through factory
+- **21 Factory Tests**: ProxyFactory role management, clone creation, and access control
 
 
 Run all tests with:
@@ -213,48 +216,6 @@ $ forge test --summary
 ## Aknowledged Issue (Audit):
 - Overpayments during Launch are not refunded. Our UI is designed to prevent this by guiding users to pay the accurate fee.
 -  For ERC1155, maxSupply is only set for token ID 0 during initialization, for other IDs, it can be set later using the setMaxSupply function
-
-## Deployment
-
-### Optimism Sepolia Testnet
-
-All contracts are deployed and verified on Optimism Sepolia:
-
-1. **FractalERC721 Implementation**
-   - Address: `0x473Ffc0f943B1a39576D98537133C6ae688d135e`
-   - [View on Etherscan](https://sepolia-optimism.etherscan.io/address/0x473Ffc0f943B1a39576D98537133C6ae688d135e)
-
-2. **FractalERC1155 Implementation**
-   - Address: `0xe850E1BF5Cfb124B5D986A301e925aBBaDC34F9C`
-   - [View on Etherscan](https://sepolia-optimism.etherscan.io/address/0xe850E1BF5Cfb124B5D986A301e925aBBaDC34F9C)
-
-3. **MinimalProxy Factory**
-   - Address: `0xde94151D90F215925BA69f3014E554bf885449f3`
-   - [View on Etherscan](https://sepolia-optimism.etherscan.io/address/0xde94151D90F215925BA69f3014E554bf885449f3)
-
-4. **FractalLaunchpad**
-   - Address: `0xe2a880075Dc5Ec5D6F788BbD25042F51A3BaB27b`
-   - [View on Etherscan](https://sepolia-optimism.etherscan.io/address/0xe2a880075Dc5Ec5D6F788BbD25042F51A3BaB27b)
-
-### Base Sepolia Testnet
-
-All contracts are deployed and verified on Base Sepolia:
-
-1. **FractalERC721 Implementation**
-   - Address: `0x89Fbe4c8D8ff2679Bc97dE1140f7c6Ac01b9B1Ef`
-   - [View on Blockscout](https://base-sepolia.blockscout.com/address/0x89Fbe4c8D8ff2679Bc97dE1140f7c6Ac01b9B1Ef)
-
-2. **FractalERC1155 Implementation**
-   - Address: `0xEC151c90047aF420cF62f32840580Eb8764862b6`
-   - [View on Blockscout](https://base-sepolia.blockscout.com/address/0xEC151c90047aF420cF62f32840580Eb8764862b6)
-
-3. **MinimalProxy Factory**
-   - Address: `0xfB86636532Dec2F7e2006261Eda917d97D3E58c5`
-   - [View on Blockscout](https://base-sepolia.blockscout.com/address/0xfB86636532Dec2F7e2006261Eda917d97D3E58c5)
-
-4. **FractalLaunchpad**
-   - Address: `0x22797574900038d794234B4fBE0446288ee46c91`
-   - [View on Blockscout](https://base-sepolia.blockscout.com/address/0x22797574900038d794234B4fBE0446288ee46c91)
 
 ## License
 
