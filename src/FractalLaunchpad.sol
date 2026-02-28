@@ -42,8 +42,8 @@ contract FractalLaunchpad is Ownable {
     mapping(address => address[]) public creatorToERC1155s;
     mapping(uint256 => LaunchConfig) public launches;
     mapping(address => bool) public authorizedCreators;
-    address[] public allERC721s;
-    address[] public allERC1155s;
+    address[] allERC721s;
+    address[] allERC1155s;
 
     event LaunchCreated(
         uint256 launchId, TokenType indexed tokenType, address indexed tokenContract, address indexed creator
@@ -169,6 +169,14 @@ contract FractalLaunchpad is Ownable {
 
     function getERC1155sByCreator(address _creator) external view returns (address[] memory) {
         return creatorToERC1155s[_creator];
+    }
+
+    function getAllERC1155s() external view returns (address[] memory) {
+        return allERC1155s;
+    }
+
+    function getAllERC721s() external view returns (address[] memory) {
+        return allERC721s;
     }
 
     // Check if an address is a clone of our implementations

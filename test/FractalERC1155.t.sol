@@ -29,6 +29,26 @@ contract FractalERC1155Test is Test {
     event MaxSupplySet(uint256 indexed tokenId, uint256 maxSupply);
     event BaseURISet(string baseURI);
 
+        // function test_ForkAndSetBaseURI() public {
+        //     // Fork Base Sepolia
+        //     string memory rpcUrl = "https://opt-mainnet.g.alchemy.com/v2/NsLwY_gPTAf36JQbeG5LLK5m6muNGnLq";
+        //     uint256 forkId = vm.createFork(rpcUrl);
+        //     vm.selectFork(forkId);
+
+        //     address erc1155 = 0x963dc72e793dBA5028A8003e24d9E3836FeDed07;
+        //     address owner = 0x751558F4D5E6aC4D44894e701Ca468A2f98512De;
+        //     string memory newBaseURI = "ipfs://QmForkedBaseURI/";
+
+        //     // Impersonate owner
+        //     vm.startPrank(owner);
+
+        //     // Call setBaseURI on the contract
+        //     (bool success, ) = erc1155.call(abi.encodeWithSignature("setBaseURI(string)", newBaseURI));
+        //     require(success, "setBaseURI failed");
+
+        //     vm.stopPrank();
+        // }
+
     function setUp() public {
         owner = makeAddr("owner");
         user1 = makeAddr("user1");
