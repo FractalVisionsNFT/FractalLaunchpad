@@ -20,8 +20,13 @@ contract FractalERC1155Impl is
     error MaxSupplyBelowCurrentSupply();
     error LengthMismatch();
     error NotAuthorized();
+    error RoyaltyExceedsCap();
+
 
     // State Variables
+    /// @dev 10% hard cap on all royalties — default and per-token
+    uint96 public constant MAX_ROYALTY_BPS = 1000;
+
     string public name;
     string public symbol;
     mapping(uint256 => uint256) public totalSupply;
@@ -31,6 +36,7 @@ contract FractalERC1155Impl is
     event MaxSupplySet(uint256 indexed tokenId, uint256 maxSupply);
     event BaseURISet(string baseURI);
     event LicenseVersionSet(LicenseVersion indexed licenseVersion);
+    event TokenRoyaltySet(uint256 indexed tokenId, address receiver, uint96 feeNumerator);
 
     // note: maxSupply is only set for token ID 0 during initialization, for other IDs it can be set later using the setMaxSupply function
     /**
@@ -40,7 +46,7 @@ contract FractalERC1155Impl is
      * @param _maxSupply Max supply for token ID 0 (0 for unlimited)
      * @param _baseURI Base URI for token metadata
      * @param _owner Contract owner address
-     * @param _royaltyFee Royalty fee in basis points (500 = 5%)
+     * @param _royaltyFee Royalty fee in basis points (500 = 5%). Cannot exceed 1000 (10%).
      * @param _licenseVersion License type for NFT usage rights
      */
     function initialize(
@@ -52,6 +58,8 @@ contract FractalERC1155Impl is
         uint96 _royaltyFee,
         LicenseVersion _licenseVersion
     ) public initializer {
+        if (_royaltyFee > MAX_ROYALTY_BPS) revert RoyaltyExceedsCap();
+
         __ERC1155_init(_baseURI);
         __Ownable_init(_owner);
         __CantBeEvil_init(_licenseVersion);
@@ -93,6 +101,15 @@ contract FractalERC1155Impl is
         maxSupply[_id] = _maxSupply;
 
         emit MaxSupplySet(_id, _maxSupply);
+    }
+
+      /**
+     * @dev Override royalty for a specific token ID. Must be between 0 and 10% (0–1000 bps).
+     */
+    function setTokenRoyalty(uint256 _tokenId, address _receiver, uint96 _feeNumerator) external onlyOwner {
+        if (_feeNumerator > MAX_ROYALTY_BPS) revert RoyaltyExceedsCap();
+        _setTokenRoyalty(_tokenId, _receiver, _feeNumerator);
+        emit TokenRoyaltySet(_tokenId, _receiver, _feeNumerator);
     }
 
     function setTokenURI(uint256 _id, string memory _tokenURI) external onlyOwner {

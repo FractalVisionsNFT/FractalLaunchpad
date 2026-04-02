@@ -9,10 +9,16 @@ import {ERC2981} from "@openzeppelin/contracts/token/common/ERC2981.sol";
 import {CantBeEvilUpgradeable, LicenseVersion} from "./a16z/CantBeEvilUpgradeable.sol";
 
 contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable, CantBeEvilUpgradeable, ERC2981 {
+    // Custom errors
     error MaxSupplyBelowCurrentSupply();
     error MaxSupplyExceeded();
     error NotAuthorized();
+    error RoyaltyExceedsCap();
 
+    
+    // State Variables
+    /// @dev 10% hard cap on all royalties — default and per-token
+    uint96 public constant MAX_ROYALTY_BPS = 1000;
     uint256 public totalSupply;
     uint256 public maxSupply;
     string public baseTokenURI;
@@ -20,6 +26,8 @@ contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
     event MaxSupplySet(uint256 maxSupply);
     event BaseURISet(string baseURI);
     event LicenseVersionSet(LicenseVersion indexed licenseVersion);
+    event TokenRoyaltySet(uint256 indexed tokenId, address receiver, uint96 feeNumerator);
+
 
     function initialize(
         string memory _name,
@@ -30,6 +38,8 @@ contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
         uint96 _royaltyFee, //500 = 5%
         LicenseVersion _licenseVersion
     ) public initializer {
+        if (_royaltyFee > MAX_ROYALTY_BPS) revert RoyaltyExceedsCap();
+
         __ERC721_init(_name, _symbol);
         __Ownable_init(_owner);
         __CantBeEvil_init(_licenseVersion);
@@ -60,6 +70,15 @@ contract FractalERC721Impl is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
         maxSupply = _maxSupply;
 
         emit MaxSupplySet(_maxSupply);
+    }
+
+     /**
+     * @dev Override royalty for a specific token. Must be between 0 and 10% (0–1000 bps).
+     */
+    function setTokenRoyalty(uint256 _tokenId, address _receiver, uint96 _feeNumerator) external onlyOwner {
+        if (_feeNumerator > MAX_ROYALTY_BPS) revert RoyaltyExceedsCap();
+        _setTokenRoyalty(_tokenId, _receiver, _feeNumerator);
+        emit TokenRoyaltySet(_tokenId, _receiver, _feeNumerator);
     }
 
     function setBaseURI(string calldata _baseUri) external onlyOwner {

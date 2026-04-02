@@ -86,6 +86,13 @@ contract FractalERC1155Test is Test {
         nft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.COMMERCIAL);
     }
 
+    function test_Initialize_RevertIf_RoyaltyAboveCap() public {
+        FractalERC1155Impl newNft = new FractalERC1155Impl();
+
+        vm.expectRevert(FractalERC1155Impl.RoyaltyExceedsCap.selector);
+        newNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, 1001, LicenseVersion.PUBLIC);
+    }
+
     function test_Initialize_OnlyTokenZeroHasMaxSupply() public {
         // Other token IDs should have 0 max supply initially
         assertEq(nft.maxSupply(1), 0);
@@ -1360,6 +1367,25 @@ contract FractalERC1155Test is Test {
         assertEq(receiver, owner);
     }
 
+    function test_Royalty_SetTokenRoyalty_SuccessWithinCap() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 7, 10, "");
+        nft.setTokenRoyalty(7, user2, 1000);
+        vm.stopPrank();
+
+        (address receiver, uint256 royaltyAmount) = nft.royaltyInfo(7, 1 ether);
+        assertEq(receiver, user2);
+        assertEq(royaltyAmount, 0.1 ether);
+    }
+
+    function test_Royalty_SetTokenRoyalty_RevertIf_AboveCap() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 7, 10, "");
+        vm.expectRevert(FractalERC1155Impl.RoyaltyExceedsCap.selector);
+        nft.setTokenRoyalty(7, user2, 1001);
+        vm.stopPrank();
+    }
+
     function test_Royalty_AfterTokenTransfer() public {
         vm.startPrank(owner);
         nft.mint(user1, 0, 10, "");
@@ -1454,7 +1480,7 @@ contract FractalERC1155Test is Test {
     }
 
     function testFuzz_Royalty_VariousFees(uint96 royaltyFee) public {
-        vm.assume(royaltyFee <= 10000); // Max 100% royalty
+        vm.assume(royaltyFee <= 1000); // Max 10% royalty
 
         FractalERC1155Impl customNft = new FractalERC1155Impl();
         customNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, royaltyFee, LicenseVersion.PUBLIC);
@@ -1465,7 +1491,7 @@ contract FractalERC1155Test is Test {
         assertEq(receiver, owner);
         assertEq(royaltyAmount, (salePrice * royaltyFee) / 10000);
 
-        // Royalty should never exceed 100% of sale price
+        // Royalty should never exceed 10% of sale price
         assertTrue(royaltyAmount <= salePrice);
     }
 
