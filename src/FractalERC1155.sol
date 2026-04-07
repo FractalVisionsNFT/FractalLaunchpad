@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ERC1155Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {ERC2981} from "@openzeppelin/contracts/token/common/ERC2981.sol";
+import {ERC2981Upgradeable} from "@openzeppelin/contracts-upgradeable/token/common/ERC2981Upgradeable.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {CantBeEvilUpgradeable, LicenseVersion} from "./a16z/CantBeEvilUpgradeable.sol";
 
@@ -13,7 +13,7 @@ contract FractalERC1155Impl is
     OwnableUpgradeable,
     UUPSUpgradeable,
     CantBeEvilUpgradeable,
-    ERC2981
+    ERC2981Upgradeable
 {
     // Custom errors
     error MaxSupplyExceeded();
@@ -31,7 +31,7 @@ contract FractalERC1155Impl is
     string public symbol;
     mapping(uint256 => uint256) public totalSupply;
     mapping(uint256 => uint256) public maxSupply;
-    mapping(uint256 => string) public tokenURIs;
+    mapping(uint256 => string) private tokenURIs;
 
     event MaxSupplySet(uint256 indexed tokenId, uint256 maxSupply);
     event BaseURISet(string baseURI);
@@ -64,6 +64,7 @@ contract FractalERC1155Impl is
         __Ownable_init(_owner);
         __CantBeEvil_init(_licenseVersion);
         __UUPSUpgradeable_init();
+        __ERC2981_init();
         _setDefaultRoyalty(_owner, _royaltyFee);
         name = _name;
         symbol = _symbol;
@@ -110,6 +111,10 @@ contract FractalERC1155Impl is
         if (_feeNumerator > MAX_ROYALTY_BPS) revert RoyaltyExceedsCap();
         _setTokenRoyalty(_tokenId, _receiver, _feeNumerator);
         emit TokenRoyaltySet(_tokenId, _receiver, _feeNumerator);
+    }
+
+    function resetTokenRoyalty(uint256 _tokenId) external onlyOwner {
+        _resetTokenRoyalty(_tokenId);
     }
 
     function setTokenURI(uint256 _id, string memory _tokenURI) external onlyOwner {
@@ -161,11 +166,11 @@ contract FractalERC1155Impl is
         public
         view
         virtual
-        override(ERC1155Upgradeable, CantBeEvilUpgradeable, ERC2981)
+        override(ERC1155Upgradeable, CantBeEvilUpgradeable, ERC2981Upgradeable)
         returns (bool)
     {
         return ERC1155Upgradeable.supportsInterface(interfaceId) || CantBeEvilUpgradeable.supportsInterface(interfaceId)
-            || ERC2981.supportsInterface(interfaceId);
+            || ERC2981Upgradeable.supportsInterface(interfaceId);
     }
 
     /**

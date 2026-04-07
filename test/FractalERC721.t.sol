@@ -160,6 +160,37 @@ contract FractalERC721Test is Test {
         vm.stopPrank();
     }
 
+    function test_MintWithURI_Success() public {
+        vm.startPrank(owner);
+
+        nft.mintWithURI(user1, 100, "https://custom.example/100.json");
+
+        assertEq(nft.ownerOf(100), user1);
+        assertEq(nft.totalSupply(), 1);
+        assertEq(nft.tokenURI(100), "https://custom.example/100.json");
+
+        vm.stopPrank();
+    }
+
+    function test_MintWithURI_RevertIf_NotOwner() public {
+        vm.startPrank(unauthorized);
+        vm.expectRevert();
+        nft.mintWithURI(user1, 101, "https://custom.example/101.json");
+        vm.stopPrank();
+    }
+
+    function test_MintWithURI_RevertIf_MaxSupplyExceeded() public {
+        vm.startPrank(owner);
+
+        nft.setMaxSupply(1);
+        nft.mintWithURI(user1, 1, "https://custom.example/1.json");
+
+        vm.expectRevert(FractalERC721Impl.MaxSupplyExceeded.selector);
+        nft.mintWithURI(user1, 2, "https://custom.example/2.json");
+
+        vm.stopPrank();
+    }
+
     // ============ Batch Mint Tests ============
 
     function test_BatchMint_Success() public {
@@ -232,6 +263,59 @@ contract FractalERC721Test is Test {
 
         infiniteNft.batchMint(user1, tokenIds);
         assertEq(infiniteNft.totalSupply(), 2000);
+
+        vm.stopPrank();
+    }
+
+    function test_BatchMintWithURI_Success() public {
+        vm.startPrank(owner);
+
+        uint256[] memory tokenIds = new uint256[](2);
+        tokenIds[0] = 201;
+        tokenIds[1] = 202;
+
+        string[] memory tokenUris = new string[](2);
+        tokenUris[0] = "https://custom.example/201.json";
+        tokenUris[1] = "https://custom.example/202.json";
+
+        nft.batchMintWithURI(user1, tokenIds, tokenUris);
+
+        assertEq(nft.totalSupply(), 2);
+        assertEq(nft.ownerOf(201), user1);
+        assertEq(nft.ownerOf(202), user1);
+        assertEq(nft.tokenURI(201), "https://custom.example/201.json");
+        assertEq(nft.tokenURI(202), "https://custom.example/202.json");
+
+        vm.stopPrank();
+    }
+
+    function test_BatchMintWithURI_RevertIf_LengthMismatch() public {
+        vm.startPrank(owner);
+
+        uint256[] memory tokenIds = new uint256[](2);
+        tokenIds[0] = 301;
+        tokenIds[1] = 302;
+
+        string[] memory tokenUris = new string[](1);
+        tokenUris[0] = "https://custom.example/301.json";
+
+        vm.expectRevert(FractalERC721Impl.LengthMismatch.selector);
+        nft.batchMintWithURI(user1, tokenIds, tokenUris);
+
+        vm.stopPrank();
+    }
+
+    function test_BatchMintWithURI_RevertIf_NotOwner() public {
+        vm.startPrank(unauthorized);
+
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = 303;
+
+        string[] memory tokenUris = new string[](1);
+        tokenUris[0] = "https://custom.example/303.json";
+
+        vm.expectRevert();
+        nft.batchMintWithURI(user1, tokenIds, tokenUris);
 
         vm.stopPrank();
     }
@@ -326,6 +410,43 @@ contract FractalERC721Test is Test {
         string memory newExpectedURI = string.concat(newBaseURI, "1");
         assertEq(nft.tokenURI(1), newExpectedURI);
 
+        vm.stopPrank();
+    }
+
+    function test_SetTokenUri_Success_OverridesBaseURI() public {
+        vm.startPrank(owner);
+
+        nft.mint(user1, 7);
+        nft.setTokenUri(7, "https://custom.example/7.json");
+
+        assertEq(nft.tokenURI(7), "https://custom.example/7.json");
+
+        // Base URI changes should not override custom per-token URI.
+        nft.setBaseURI("https://newbase.example/");
+        assertEq(nft.tokenURI(7), "https://custom.example/7.json");
+
+        vm.stopPrank();
+    }
+
+    function test_SetTokenUri_RevertIf_NotOwner() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 9);
+        vm.stopPrank();
+
+        vm.startPrank(unauthorized);
+        vm.expectRevert();
+        nft.setTokenUri(9, "https://hijack.example/9.json");
+        vm.stopPrank();
+    }
+
+    function test_SetTokenUri_EmptyValue_FallsBackToBaseURI() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 11);
+        nft.setTokenUri(11, "https://custom.example/11.json");
+        assertEq(nft.tokenURI(11), "https://custom.example/11.json");
+
+        nft.setTokenUri(11, "");
+        assertEq(nft.tokenURI(11), string.concat(BASE_URI, "11"));
         vm.stopPrank();
     }
 

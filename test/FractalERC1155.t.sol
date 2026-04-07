@@ -371,9 +371,8 @@ contract FractalERC1155Test is Test {
         string memory tokenURI = "https://custom.com/token/1";
 
         nft.setTokenURI(1, tokenURI);
-        assertEq(nft.tokenURIs(1), tokenURI);
         assertEq(nft.uri(1), tokenURI);
-
+        
         vm.stopPrank();
     }
 

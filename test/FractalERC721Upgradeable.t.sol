@@ -425,6 +425,33 @@ contract FractalERC721UpgradeableTest is Test {
         assertEq(upgradedProxy.newFeature(), 42); // New variable should be unchanged
     }
 
+    function test_Upgrade_PreservesCustomTokenURIData() public {
+        vm.startPrank(owner);
+        proxy.mint(user1, 42);
+        proxy.setTokenUri(42, "https://custom.example/42.json");
+        vm.stopPrank();
+
+        string memory customBefore = proxy.tokenURI(42);
+        assertEq(customBefore, "https://custom.example/42.json");
+
+        FractalERC721ImplV2 newImplementation = new FractalERC721ImplV2();
+
+        vm.startPrank(owner);
+        UUPSUpgradeable(address(proxy)).upgradeToAndCall(address(newImplementation), "");
+        vm.stopPrank();
+
+        FractalERC721ImplV2 upgradedProxy = FractalERC721ImplV2(address(proxy));
+
+        assertEq(upgradedProxy.ownerOf(42), user1);
+        assertEq(upgradedProxy.tokenURI(42), "https://custom.example/42.json");
+
+        // Ensure tokenURI fallback behavior still works for tokens without custom URI.
+        vm.startPrank(owner);
+        upgradedProxy.mint(user1, 43);
+        vm.stopPrank();
+        assertEq(upgradedProxy.tokenURI(43), string.concat(upgradedProxy.baseTokenURI(), "43"));
+    }
+
     // ============ Multiple Upgrade Tests ============
 
     function test_MultipleUpgrades_Success() public {

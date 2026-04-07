@@ -258,7 +258,6 @@ contract FractalERC1155UpgradeableTest is Test {
         string memory customURI = "https://custom.com/token/1";
         proxy.setTokenURI(1, customURI);
         assertEq(proxy.uri(1), customURI);
-        assertEq(proxy.tokenURIs(1), customURI);
 
         vm.stopPrank();
     }
@@ -860,7 +859,6 @@ contract FractalERC1155UpgradeableTest is Test {
         // Verify all custom URIs are preserved
         for (uint256 i = 0; i < numTokens; i++) {
             assertEq(upgradedProxy.uri(i), customURIs[i]);
-            assertEq(upgradedProxy.tokenURIs(i), customURIs[i]);
         }
     }
 }
