@@ -9,11 +9,10 @@ import {FractalERC1155Impl} from "../src/FractalERC1155.sol";
 
 contract FractalLaunchpadScript is Script {
     function run() public {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address feeRecipient = vm.envAddress("FEE_RECIPIENT");
-        uint256 platformFee = vm.envUint("PLATFORM_FEE"); // e.g., 0.01 ether = 10000000000000000
+        uint256 platformFee = vm.envUint("PLATFORM_FEE"); // e.g., 10000000000000000 = 0.01 ether
 
-        vm.startBroadcast(deployerPrivateKey);
+        vm.startBroadcast();
 
         // 1. Deploy implementations
         console.log("Deploying ERC721 Implementation...");
@@ -32,11 +31,15 @@ contract FractalLaunchpadScript is Script {
         // 3. Deploy launchpad
         console.log("Deploying FractalLaunchpad...");
         FractalLaunchpad launchpad = new FractalLaunchpad(
-            feeRecipient, platformFee, address(erc1155Implementation), address(erc721Implementation), address(factory)
+            feeRecipient,
+            platformFee,
+            address(erc1155Implementation),
+            address(erc721Implementation),
+            address(factory)
         );
         console.log("FractalLaunchpad deployed at:", address(launchpad));
 
-        // 4. Grant CREATOR_ROLE to launchpad so it can call createClone on the factory
+        // 4. Grant CREATOR_ROLE to launchpad
         factory.grantRole(factory.CREATOR_ROLE(), address(launchpad));
         console.log("Granted CREATOR_ROLE to Launchpad");
 
@@ -46,9 +49,9 @@ contract FractalLaunchpadScript is Script {
         console.log("\n=== Deployment Summary ===");
         console.log("ERC721 Implementation:", address(erc721Implementation));
         console.log("ERC1155 Implementation:", address(erc1155Implementation));
-        console.log("Factory:", address(factory));
-        console.log("Launchpad:", address(launchpad));
-        console.log("Fee Recipient:", feeRecipient);
-        console.log("Platform Fee:", platformFee);
+        console.log("Factory:              ", address(factory));
+        console.log("Launchpad:            ", address(launchpad));
+        console.log("Fee Recipient:        ", feeRecipient);
+        console.log("Platform Fee:         ", platformFee);
     }
 }
