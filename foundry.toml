@@ -8,13 +8,24 @@ remappings = [
 ]
 
 [rpc_endpoints]
-base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
-op_sepolia = "https://sepolia.optimism.io"
-op_mainnet = "https://mainnet.optimism.io"
+base_sepolia  = "${BASE_SEPOLIA_RPC_URL}"
+base_mainnet  = "${BASE_MAINNET_RPC_URL}"
+op_sepolia    = "${OPTIMISM_SEPOLIA_RPC_URL}"
+op_mainnet    = "${OP_MAINNET_RPC_URL}"
+shape_mainnet = "${SHAPE_MAINNET_RPC_URL}"
+ethereum_mainnet = "${ETHEREUM_MAINNET_RPC_URL}"
+astar_mainnet = "${ASTAR_MAINNET_RPC_URL}"
+zora_mainnet = "${ZORA_MAINNET_RPC_URL}"
+supersseed_mainnet = "${SUPERSEED_MAINNET_RPC_URL}"
+unichain_mainnet = "${UNICHAIN_MAINNET_RPC_URL}"
+soneium_mainnet = "${SONEIUM_MAINNET_RPC_URL}"
+
 
 [etherscan]
-base_sepolia = { key = "${BASESCAN_API_KEY}", chain = 84532, url = "https://api-sepolia.basescan.org/api" }
-op_sepolia = { key = "${BASESCAN_API_KEY}", chain = 11155420, url = "https://api.etherscan.io/v2/api?chainid=11155420" }
-op_mainnet = { key = "${BASESCAN_API_KEY}", chain = 10, url = "https://api.etherscan.io/v2/api?chainid=10" }
+base_sepolia = { key = "${BASESCAN_API_KEY}", chain = 84532,    url = "https://api-sepolia.basescan.org/api" }
+base_mainnet = { key = "${BASESCAN_API_KEY}", chain = 8453,     url = "https://api.basescan.org/api" }
+op_sepolia   = { key = "${BASESCAN_API_KEY}", chain = 11155420, url = "https://api.etherscan.io/v2/api?chainid=11155420" }
+op_mainnet   = { key = "${BASESCAN_API_KEY}", chain = 10,       url = "https://api.etherscan.io/v2/api?chainid=10" }
+
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
