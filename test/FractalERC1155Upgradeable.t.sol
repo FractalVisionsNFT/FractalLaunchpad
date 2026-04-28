@@ -26,9 +26,9 @@ contract FractalERC1155ImplV2 is FractalERC1155Impl {
         tokenFlags[_tokenId] = _flag;
     }
 
-    // Override to test function changes
-    function version() external pure returns (string memory) {
-        return "v2.0.0";
+    // New version function to test upgrade functionality
+    function getVersion() external pure returns (uint8) {
+        return uint8(2);
     }
 
     // Test batch operations with new features
@@ -357,7 +357,7 @@ contract FractalERC1155UpgradeableTest is Test {
         upgradedProxy.setTokenFlag(1, true);
         assertEq(upgradedProxy.newFeature(), 12345);
         assertTrue(upgradedProxy.tokenFlags(1));
-        assertEq(upgradedProxy.version(), "v2.0.0");
+        assertEq(upgradedProxy.version(), uint8(2));
         vm.stopPrank();
     }
 
@@ -671,7 +671,7 @@ contract FractalERC1155UpgradeableTest is Test {
 
         // Verify upgrade succeeded
         FractalERC1155ImplV2 upgradedProxy = FractalERC1155ImplV2(address(proxy));
-        assertEq(upgradedProxy.version(), "v2.0.0");
+        assertEq(upgradedProxy.version(), uint8(2));
     }
 
     function test_UpgradeSecurity_MaliciousContractUpgrade() public {
@@ -860,5 +860,121 @@ contract FractalERC1155UpgradeableTest is Test {
         for (uint256 i = 0; i < numTokens; i++) {
             assertEq(upgradedProxy.uri(i), customURIs[i]);
         }
+    }
+
+    // ============ ContractUpgraded Event + Version Tests ============
+
+    event ContractUpgraded(address indexed newImplementation, uint8 version);
+
+    function test_Upgrade_EmitsContractUpgradedEvent() public {
+        FractalERC1155ImplV2 newImplementation = new FractalERC1155ImplV2();
+
+        vm.startPrank(owner);
+        vm.expectEmit(true, false, false, true);
+        emit ContractUpgraded(address(newImplementation), proxy.version());
+        UUPSUpgradeable(address(proxy)).upgradeToAndCall(address(newImplementation), "");
+        vm.stopPrank();
+    }
+
+    function test_Upgrade_VersionAfterUpgrade() public {
+        uint8 versionBefore = proxy.version();
+
+        FractalERC1155ImplV2 newImplementation = new FractalERC1155ImplV2();
+
+        vm.startPrank(owner);
+        UUPSUpgradeable(address(proxy)).upgradeToAndCall(address(newImplementation), "");
+        vm.stopPrank();
+
+        FractalERC1155ImplV2 upgradedProxy = FractalERC1155ImplV2(address(proxy));
+        uint8 versionAfter = upgradedProxy.version();
+
+        assertEq(versionBefore, uint8(2));
+        assertEq(versionAfter, uint8(2));
+
+        // getVersion() only exists on V2 — proves delegation reaches new implementation
+        assertEq(upgradedProxy.getVersion(), uint8(2));
+    }
+
+    function test_Upgrade_MultipleUpgrades_VersionConsistent() public {
+        // First upgrade
+        FractalERC1155ImplV2 implV2a = new FractalERC1155ImplV2();
+        vm.startPrank(owner);
+        vm.expectEmit(true, false, false, true);
+        emit ContractUpgraded(address(implV2a), uint8(2));
+        UUPSUpgradeable(address(proxy)).upgradeToAndCall(address(implV2a), "");
+        vm.stopPrank();
+
+        // Second upgrade
+        FractalERC1155ImplV2 implV2b = new FractalERC1155ImplV2();
+        vm.startPrank(owner);
+        vm.expectEmit(true, false, false, true);
+        emit ContractUpgraded(address(implV2b), uint8(2));
+        UUPSUpgradeable(address(proxy)).upgradeToAndCall(address(implV2b), "");
+        vm.stopPrank();
+
+        FractalERC1155ImplV2 up = FractalERC1155ImplV2(address(proxy));
+        assertEq(up.version(), uint8(2));
+        assertEq(up.owner(), owner);
+    }
+
+    // ============ setLicenseVersion After Upgrade ============
+
+    function test_Upgrade_SetLicenseVersion_WorksOnUpgradedProxy() public {
+        FractalERC1155ImplV2 newImpl = new FractalERC1155ImplV2();
+        vm.startPrank(owner);
+        UUPSUpgradeable(address(proxy)).upgradeToAndCall(address(newImpl), "");
+        vm.stopPrank();
+
+        FractalERC1155ImplV2 up = FractalERC1155ImplV2(address(proxy));
+
+        assertEq(up.getLicenseName(), "COMMERCIAL"); // preserved from init
+
+        vm.startPrank(owner);
+        up.setLicenseVersion(LicenseVersion.PUBLIC);
+        vm.stopPrank();
+
+        assertEq(up.getLicenseName(), "PUBLIC");
+        assertEq(up.getLicenseURI(), "ar://zmc1WTspIhFyVY82bwfAIcIExLFH5lUcHHUN0wXg4W8/0");
+    }
+
+    // ============ setDefaultRoyaltyInfo After Upgrade ============
+
+    function test_Upgrade_DefaultRoyaltyInfo_PersistsAndUpdates() public {
+        // Mint and set royalty BEFORE upgrade
+        vm.startPrank(owner);
+        proxy.mint(user1, 0, 100, "");
+        proxy.setDefaultRoyaltyInfo(user2, 750); // 7.5%
+        vm.stopPrank();
+
+        // Upgrade
+        FractalERC1155ImplV2 newImpl = new FractalERC1155ImplV2();
+        vm.startPrank(owner);
+        UUPSUpgradeable(address(proxy)).upgradeToAndCall(address(newImpl), "");
+        vm.stopPrank();
+
+        FractalERC1155ImplV2 up = FractalERC1155ImplV2(address(proxy));
+
+        // Royalty set before upgrade must still be respected after upgrade
+        (address receiver, uint256 amount) = up.royaltyInfo(0, 1 ether);
+        assertEq(receiver, user2);
+        assertEq(amount, 0.075 ether);
+
+        // Update royalty post-upgrade
+        vm.startPrank(owner);
+        up.setDefaultRoyaltyInfo(user1, 300); // 3%
+        vm.stopPrank();
+
+        (receiver, amount) = up.royaltyInfo(0, 1 ether);
+        assertEq(receiver, user1);
+        assertEq(amount, 0.03 ether);
+
+        // Resale: user1 sends some tokens to user2 — royalty must still be correct
+        vm.startPrank(user1);
+        up.safeTransferFrom(user1, user2, 0, 50, "");
+        vm.stopPrank();
+
+        (receiver, amount) = up.royaltyInfo(0, 2 ether);
+        assertEq(receiver, user1);
+        assertEq(amount, 0.06 ether); // 3% of 2 ether
     }
 }

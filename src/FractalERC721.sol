@@ -37,10 +37,27 @@ contract FractalERC721Impl is
     event BaseURISet(string baseURI);
     event LicenseVersionSet(LicenseVersion indexed licenseVersion);
     event TokenRoyaltySet(uint256 indexed tokenId, address receiver, uint96 feeNumerator);
+    event DefaultRoyaltySet(address receiver, uint96 feeNumerator);
+    event ContractUpgraded(address indexed newImplementation, uint8 version);
+
     // EIP-4906
     event MetadataUpdate(uint256 _tokenId);
 
 
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
+     * @dev Initializes the contract
+     * @param _name Token collection name
+     * @param _symbol Token collection symbol
+     * @param _maxSupply Max supply for the collection (0 for unlimited)
+     * @param _baseUri Base URI for token metadata
+     * @param _owner Contract owner address
+     * @param _royaltyFee Royalty fee in basis points (500 = 5%). Cannot exceed 1000 (10%).
+     * @param _licenseVersion License type for NFT usage rights
+     */
     function initialize(
         string memory _name,
         string memory _symbol,
@@ -62,6 +79,10 @@ contract FractalERC721Impl is
         baseTokenURI = _baseUri;
 
         emit LicenseVersionSet(_licenseVersion);
+    }
+
+    function version() public pure returns (uint8) {
+        return uint8(2);
     }
 
     function mint(address _to, uint256 _tokenId) external onlyOwner {
@@ -118,6 +139,12 @@ contract FractalERC721Impl is
         _setTokenRoyalty(_tokenId, _receiver, _feeNumerator);
         emit TokenRoyaltySet(_tokenId, _receiver, _feeNumerator);
     }
+    
+    function setDefaultRoyaltyInfo(address _receiver, uint96 _feeNumerator) external onlyOwner {
+        if (_feeNumerator > MAX_ROYALTY_BPS) revert RoyaltyExceedsCap();
+        _setDefaultRoyalty(_receiver, _feeNumerator);
+        emit DefaultRoyaltySet(_receiver, _feeNumerator);
+    }
 
     function resetTokenRoyalty(uint256 _tokenId) external onlyOwner {
         _resetTokenRoyalty(_tokenId);  
@@ -147,9 +174,14 @@ contract FractalERC721Impl is
         }
         
         string memory baseURI = _baseURI();
-        return bytes(baseURI).length > 0 ? string.concat(baseURI, Strings.toString(_tokenId)) : "";
-      
-}
+        return bytes(baseURI).length > 0 ? string.concat(baseURI, Strings.toString(_tokenId)) : ""; 
+    }
+
+    function setLicenseVersion(LicenseVersion _licenseVersion) external onlyOwner {
+        licenseVersion = _licenseVersion;
+        emit LicenseVersionSet(_licenseVersion);
+    }
+
 
     function burn(uint256 _tokenId) external {
         if (!_isAuthorized(_ownerOf(_tokenId), msg.sender, _tokenId)) revert NotAuthorized();
@@ -174,5 +206,7 @@ contract FractalERC721Impl is
     }
 
     // UUPS Upgrade authorization - only owner can upgrade
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        emit ContractUpgraded(newImplementation, version());
+    }
 }

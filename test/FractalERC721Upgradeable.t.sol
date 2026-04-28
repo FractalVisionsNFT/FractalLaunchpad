@@ -21,8 +21,8 @@ contract FractalERC721ImplV2 is FractalERC721Impl {
         newFeature = _value;
     }
 
-    // Override to test function changes
-    function version() external pure returns (string memory) {
+    // New version function to test upgrade functionality
+    function getVersion() external pure returns (string memory) {
         return "v2.0.0";
     }
 
@@ -276,7 +276,7 @@ contract FractalERC721UpgradeableTest is Test {
         vm.startPrank(owner);
         upgradedProxy.setNewFeature(12345);
         assertEq(upgradedProxy.newFeature(), 12345);
-        assertEq(upgradedProxy.version(), "v2.0.0");
+        assertEq(upgradedProxy.version(), uint8(2));
         vm.stopPrank();
     }
 
@@ -510,7 +510,7 @@ contract FractalERC721UpgradeableTest is Test {
 
         // Verify upgrade succeeded
         FractalERC721ImplV2 upgradedProxy = FractalERC721ImplV2(address(proxy));
-        assertEq(upgradedProxy.version(), "v2.0.0");
+        assertEq(upgradedProxy.version(), uint8(2));
     }
 
     function test_UpgradeSecurity_CannotUpgradeToMaliciousContract() public {
@@ -669,5 +669,128 @@ contract FractalERC721UpgradeableTest is Test {
         }
 
         assertEq(upgradedProxy.totalSupply(), numTokens);
+    }
+
+    // ============ ContractUpgraded Event + Version Tests ============
+
+    event ContractUpgraded(address indexed newImplementation, uint8 version);
+
+    function test_Upgrade_EmitsContractUpgradedEvent() public {
+        FractalERC721ImplV2 newImplementation = new FractalERC721ImplV2();
+
+        // The event is emitted inside _authorizeUpgrade, which runs during upgradeToAndCall
+        // It should carry the NEW implementation address and the CURRENT version()
+        vm.startPrank(owner);
+        vm.expectEmit(true, false, false, true);
+        emit ContractUpgraded(address(newImplementation), proxy.version());
+        UUPSUpgradeable(address(proxy)).upgradeToAndCall(address(newImplementation), "");
+        vm.stopPrank();
+    }
+
+    function test_Upgrade_VersionAfterUpgrade() public {
+        // version() is a pure function on the implementation; after upgrade the proxy
+        // delegates to the new implementation, so it must return the new impl's version.
+        uint8 versionBefore = proxy.version();
+
+        FractalERC721ImplV2 newImplementation = new FractalERC721ImplV2();
+
+        vm.startPrank(owner);
+        UUPSUpgradeable(address(proxy)).upgradeToAndCall(address(newImplementation), "");
+        vm.stopPrank();
+
+        FractalERC721ImplV2 upgradedProxy = FractalERC721ImplV2(address(proxy));
+        uint8 versionAfter = upgradedProxy.version();
+
+        // V2 does not override version(), so both report uint8(2).
+        // The important assertion is that the version is a valid uint8 and doesn't revert.
+        assertEq(versionBefore, uint8(2));
+        assertEq(versionAfter, uint8(2));
+
+        // getVersion() is a NEW function only on V2 — confirms we are on the new impl
+        assertEq(upgradedProxy.getVersion(), "v2.0.0");
+    }
+
+    function test_Upgrade_MultipleUpgrades_VersionConsistent() public {
+        // First upgrade
+        FractalERC721ImplV2 implV2a = new FractalERC721ImplV2();
+        vm.startPrank(owner);
+        vm.expectEmit(true, false, false, true);
+        emit ContractUpgraded(address(implV2a), uint8(2));
+        UUPSUpgradeable(address(proxy)).upgradeToAndCall(address(implV2a), "");
+        vm.stopPrank();
+
+        // Second upgrade (re-deploy of same V2 type)
+        FractalERC721ImplV2 implV2b = new FractalERC721ImplV2();
+        vm.startPrank(owner);
+        vm.expectEmit(true, false, false, true);
+        emit ContractUpgraded(address(implV2b), uint8(2));
+        UUPSUpgradeable(address(proxy)).upgradeToAndCall(address(implV2b), "");
+        vm.stopPrank();
+
+        // State must survive two upgrades
+        FractalERC721ImplV2 up = FractalERC721ImplV2(address(proxy));
+        assertEq(up.version(), uint8(2));
+        assertEq(up.owner(), owner);
+    }
+
+    // ============ setLicenseVersion After Upgrade ============
+
+    function test_Upgrade_SetLicenseVersion_WorksOnUpgradedProxy() public {
+        FractalERC721ImplV2 newImpl = new FractalERC721ImplV2();
+        vm.startPrank(owner);
+        UUPSUpgradeable(address(proxy)).upgradeToAndCall(address(newImpl), "");
+        vm.stopPrank();
+
+        FractalERC721ImplV2 up = FractalERC721ImplV2(address(proxy));
+
+        assertEq(up.getLicenseName(), "COMMERCIAL"); // preserved from init
+
+        vm.startPrank(owner);
+        up.setLicenseVersion(LicenseVersion.PUBLIC);
+        vm.stopPrank();
+
+        assertEq(up.getLicenseName(), "PUBLIC");
+        assertEq(up.getLicenseURI(), "ar://zmc1WTspIhFyVY82bwfAIcIExLFH5lUcHHUN0wXg4W8/0");
+    }
+
+    // ============ setDefaultRoyaltyInfo After Upgrade ============
+
+    function test_Upgrade_DefaultRoyaltyInfo_PersistsAndUpdates() public {
+        // Mint and set custom royalty BEFORE upgrade
+        vm.startPrank(owner);
+        proxy.mint(user1, 1);
+        proxy.setDefaultRoyaltyInfo(user2, 750); // 7.5%
+        vm.stopPrank();
+
+        // Upgrade
+        FractalERC721ImplV2 newImpl = new FractalERC721ImplV2();
+        vm.startPrank(owner);
+        UUPSUpgradeable(address(proxy)).upgradeToAndCall(address(newImpl), "");
+        vm.stopPrank();
+
+        FractalERC721ImplV2 up = FractalERC721ImplV2(address(proxy));
+
+        // Royalty set BEFORE upgrade must still be respected AFTER upgrade
+        (address receiver, uint256 amount) = up.royaltyInfo(1, 1 ether);
+        assertEq(receiver, user2);
+        assertEq(amount, 0.075 ether);
+
+        // Update royalty on the upgraded proxy
+        vm.startPrank(owner);
+        up.setDefaultRoyaltyInfo(user1, 300); // 3%
+        vm.stopPrank();
+
+        (receiver, amount) = up.royaltyInfo(1, 1 ether);
+        assertEq(receiver, user1);
+        assertEq(amount, 0.03 ether);
+
+        // Transfer and verify royalty still works after resale
+        vm.startPrank(user1);
+        up.transferFrom(user1, user2, 1);
+        vm.stopPrank();
+
+        (receiver, amount) = up.royaltyInfo(1, 2 ether);
+        assertEq(receiver, user1);
+        assertEq(amount, 0.06 ether); // 3% of 2 ether
     }
 }

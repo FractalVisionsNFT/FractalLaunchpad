@@ -4,6 +4,8 @@ pragma solidity ^0.8.13;
 import {Test} from "forge-std/Test.sol";
 import {LicenseVersion, FractalERC721Impl} from "../src/FractalERC721.sol";
 import {ICantBeEvil} from "@a16z/contracts/licenses/ICantBeEvil.sol";
+import {IERC2981} from "@openzeppelin/contracts/interfaces/IERC2981.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract FractalERC721Test is Test {
     FractalERC721Impl public nft;
@@ -23,6 +25,29 @@ contract FractalERC721Test is Test {
     event LicenseVersionSet(LicenseVersion indexed licenseVersion);
     event MaxSupplySet(uint256 maxSupply);
     event BaseURISet(string baseURI);
+    event TokenRoyaltySet(uint256 indexed tokenId, address receiver, uint96 feeNumerator);
+    event DefaultRoyaltySet(address receiver, uint96 feeNumerator);
+    event ContractUpgraded(address indexed newImplementation, uint8 version);
+    event MetadataUpdate(uint256 _tokenId);
+
+    /// @dev Helper: deploy a fresh proxy with the given parameters.
+    function _deployProxy(
+        string memory _name,
+        string memory _symbol,
+        uint256 _maxSupply,
+        string memory _baseUri,
+        address _owner,
+        uint96 _royaltyFee,
+        LicenseVersion _licenseVersion
+    ) internal returns (FractalERC721Impl) {
+        FractalERC721Impl impl = new FractalERC721Impl();
+        bytes memory initData = abi.encodeWithSelector(
+            FractalERC721Impl.initialize.selector,
+            _name, _symbol, _maxSupply, _baseUri, _owner, _royaltyFee, _licenseVersion
+        );
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        return FractalERC721Impl(address(proxy));
+    }
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -30,11 +55,8 @@ contract FractalERC721Test is Test {
         user2 = makeAddr("user2");
         unauthorized = makeAddr("unauthorized");
 
-        // Deploy the implementation
-        nft = new FractalERC721Impl();
-
-        // Initialize with owner
-        nft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.COMMERCIAL);
+        // Deploy through a UUPS proxy (implementation has _disableInitializers in constructor)
+        nft = _deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.COMMERCIAL);
     }
 
     // ============ Initialization Tests ============
@@ -49,8 +71,7 @@ contract FractalERC721Test is Test {
     }
 
     function test_Initialize_ZeroMaxSupply() public {
-        FractalERC721Impl infiniteNft = new FractalERC721Impl();
-        infiniteNft.initialize(NAME, SYMBOL, 0, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PUBLIC);
+        FractalERC721Impl infiniteNft = _deployProxy(NAME, SYMBOL, 0, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PUBLIC);
 
         assertEq(infiniteNft.maxSupply(), 0);
         assertEq(infiniteNft.name(), NAME);
@@ -59,19 +80,19 @@ contract FractalERC721Test is Test {
     }
 
     function test_Initialize_CannotReinitialize() public {
-        FractalERC721Impl newNft = new FractalERC721Impl();
-        newNft.initialize(NAME, SYMBOL, 0, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PUBLIC);
-
-        // Should revert if we try to initialize again
+        // The proxy itself should revert on a second initialize call
         vm.expectRevert();
-        newNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.COMMERCIAL);
+        nft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.COMMERCIAL);
     }
 
     function test_Initialize_RevertIf_RoyaltyAboveCap() public {
-        FractalERC721Impl newNft = new FractalERC721Impl();
-
+        FractalERC721Impl impl = new FractalERC721Impl();
+        bytes memory initData = abi.encodeWithSelector(
+            FractalERC721Impl.initialize.selector,
+            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, uint96(1001), LicenseVersion.PUBLIC
+        );
         vm.expectRevert(FractalERC721Impl.RoyaltyExceedsCap.selector);
-        newNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, 1001, LicenseVersion.PUBLIC);
+        new ERC1967Proxy(address(impl), initData);
     }
 
     // ============ Mint Tests ============
@@ -134,8 +155,7 @@ contract FractalERC721Test is Test {
 
     function test_Mint_InfiniteWhenMaxSupplyZero() public {
         // Create NFT with zero max supply
-        FractalERC721Impl infiniteNft = new FractalERC721Impl();
-        infiniteNft.initialize(NAME, SYMBOL, 0, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PUBLIC);
+        FractalERC721Impl infiniteNft = _deployProxy(NAME, SYMBOL, 0, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PUBLIC);
 
         vm.startPrank(owner);
 
@@ -251,8 +271,7 @@ contract FractalERC721Test is Test {
     }
 
     function test_BatchMint_InfiniteWhenMaxSupplyZero() public {
-        FractalERC721Impl infiniteNft = new FractalERC721Impl();
-        infiniteNft.initialize(NAME, SYMBOL, 0, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PUBLIC);
+        FractalERC721Impl infiniteNft = _deployProxy(NAME, SYMBOL, 0, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PUBLIC);
 
         vm.startPrank(owner);
 
@@ -711,8 +730,7 @@ contract FractalERC721Test is Test {
             ["PUBLIC", "EXCLUSIVE", "COMMERCIAL", "COMMERCIAL_NO_HATE", "PERSONAL", "PERSONAL_NO_HATE"];
 
         for (uint256 i = 0; i < licenses.length; i++) {
-            FractalERC721Impl testNft = new FractalERC721Impl();
-            testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, licenses[i]);
+            FractalERC721Impl testNft = _deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, licenses[i]);
 
             assertEq(testNft.getLicenseName(), expectedNames[i]);
 
@@ -727,67 +745,38 @@ contract FractalERC721Test is Test {
         string memory baseURI = "ar://zmc1WTspIhFyVY82bwfAIcIExLFH5lUcHHUN0wXg4W8/";
 
         // Test PUBLIC (0)
-        FractalERC721Impl publicNft = new FractalERC721Impl();
-        publicNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PUBLIC);
+        FractalERC721Impl publicNft = _deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PUBLIC);
         assertEq(publicNft.getLicenseURI(), string.concat(baseURI, "0"));
 
         // Test EXCLUSIVE (1)
-        FractalERC721Impl exclusiveNft = new FractalERC721Impl();
-        exclusiveNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.EXCLUSIVE);
+        FractalERC721Impl exclusiveNft = _deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.EXCLUSIVE);
         assertEq(exclusiveNft.getLicenseURI(), string.concat(baseURI, "1"));
 
         // Test COMMERCIAL (2)
-        FractalERC721Impl commercialNft = new FractalERC721Impl();
-        commercialNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.COMMERCIAL);
+        FractalERC721Impl commercialNft = _deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.COMMERCIAL);
         assertEq(commercialNft.getLicenseURI(), string.concat(baseURI, "2"));
 
         // Test COMMERCIAL_NO_HATE (3)
-        FractalERC721Impl commercialNoHateNft = new FractalERC721Impl();
-        commercialNoHateNft.initialize(
-            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.COMMERCIAL_NO_HATE
-        );
+        FractalERC721Impl commercialNoHateNft = _deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.COMMERCIAL_NO_HATE);
         assertEq(commercialNoHateNft.getLicenseURI(), string.concat(baseURI, "3"));
 
         // Test PERSONAL (4)
-        FractalERC721Impl personalNft = new FractalERC721Impl();
-        personalNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PERSONAL);
+        FractalERC721Impl personalNft = _deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PERSONAL);
         assertEq(personalNft.getLicenseURI(), string.concat(baseURI, "4"));
 
         // Test PERSONAL_NO_HATE (5)
-        FractalERC721Impl personalNoHateNft = new FractalERC721Impl();
-        personalNoHateNft.initialize(
-            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PERSONAL_NO_HATE
-        );
+        FractalERC721Impl personalNoHateNft = _deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PERSONAL_NO_HATE);
         assertEq(personalNoHateNft.getLicenseURI(), string.concat(baseURI, "5"));
     }
 
     function test_CantBeEvil_GetLicenseName_AllVersions() public {
         // Test each license version returns correct name
-        FractalERC721Impl testNft;
-
-        testNft = new FractalERC721Impl();
-        testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PUBLIC);
-        assertEq(testNft.getLicenseName(), "PUBLIC");
-
-        testNft = new FractalERC721Impl();
-        testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.EXCLUSIVE);
-        assertEq(testNft.getLicenseName(), "EXCLUSIVE");
-
-        testNft = new FractalERC721Impl();
-        testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.COMMERCIAL);
-        assertEq(testNft.getLicenseName(), "COMMERCIAL");
-
-        testNft = new FractalERC721Impl();
-        testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.COMMERCIAL_NO_HATE);
-        assertEq(testNft.getLicenseName(), "COMMERCIAL_NO_HATE");
-
-        testNft = new FractalERC721Impl();
-        testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PERSONAL);
-        assertEq(testNft.getLicenseName(), "PERSONAL");
-
-        testNft = new FractalERC721Impl();
-        testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PERSONAL_NO_HATE);
-        assertEq(testNft.getLicenseName(), "PERSONAL_NO_HATE");
+        assertEq(_deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PUBLIC).getLicenseName(), "PUBLIC");
+        assertEq(_deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.EXCLUSIVE).getLicenseName(), "EXCLUSIVE");
+        assertEq(_deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.COMMERCIAL).getLicenseName(), "COMMERCIAL");
+        assertEq(_deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.COMMERCIAL_NO_HATE).getLicenseName(), "COMMERCIAL_NO_HATE");
+        assertEq(_deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PERSONAL).getLicenseName(), "PERSONAL");
+        assertEq(_deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PERSONAL_NO_HATE).getLicenseName(), "PERSONAL_NO_HATE");
     }
 
     function test_CantBeEvil_SupportsInterface() public {
@@ -813,13 +802,17 @@ contract FractalERC721Test is Test {
     }
 
     function test_CantBeEvil_LicenseVersionSetEvent() public {
-        // Test that LicenseVersionSet event is emitted during initialization
-        FractalERC721Impl testNft = new FractalERC721Impl();
+        // Test that LicenseVersionSet event is emitted during proxy initialization
+        FractalERC721Impl impl = new FractalERC721Impl();
+        bytes memory initData = abi.encodeWithSelector(
+            FractalERC721Impl.initialize.selector,
+            NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.COMMERCIAL
+        );
 
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit(true, false, false, false);
         emit LicenseVersionSet(LicenseVersion.COMMERCIAL);
 
-        testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.COMMERCIAL);
+        new ERC1967Proxy(address(impl), initData);
     }
 
     function test_CantBeEvil_LicenseIntegrationWithNFTOperations() public {
@@ -875,13 +868,9 @@ contract FractalERC721Test is Test {
 
     function test_CantBeEvil_MultipleLicenseTypesWorkflow() public {
         // Create NFTs with different license types and test they work independently
-        FractalERC721Impl publicNft = new FractalERC721Impl();
-        FractalERC721Impl personalNft = new FractalERC721Impl();
-        FractalERC721Impl exclusiveNft = new FractalERC721Impl();
-
-        publicNft.initialize("Public NFT", "PUB", 1000, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PUBLIC);
-        personalNft.initialize("Personal NFT", "PERS", 500, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PERSONAL);
-        exclusiveNft.initialize("Exclusive NFT", "EXC", 100, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.EXCLUSIVE);
+        FractalERC721Impl publicNft = _deployProxy("Public NFT", "PUB", 1000, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PUBLIC);
+        FractalERC721Impl personalNft = _deployProxy("Personal NFT", "PERS", 500, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.PERSONAL);
+        FractalERC721Impl exclusiveNft = _deployProxy("Exclusive NFT", "EXC", 100, BASE_URI, owner, ROYALTY_FEE, LicenseVersion.EXCLUSIVE);
 
         // Verify each has correct license
         assertEq(publicNft.getLicenseName(), "PUBLIC");
@@ -912,9 +901,7 @@ contract FractalERC721Test is Test {
         vm.assume(licenseVersionRaw <= 5); // Valid license versions are 0-5
 
         LicenseVersion licenseVersion = LicenseVersion(licenseVersionRaw);
-        FractalERC721Impl testNft = new FractalERC721Impl();
-
-        testNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, licenseVersion);
+        FractalERC721Impl testNft = _deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, ROYALTY_FEE, licenseVersion);
 
         // Should not revert and should return valid license data
         string memory licenseName = testNft.getLicenseName();
@@ -1005,24 +992,21 @@ contract FractalERC721Test is Test {
 
     function test_Royalty_DifferentRoyaltyFees() public {
         // Test with 10% royalty (1000 basis points)
-        FractalERC721Impl nft10 = new FractalERC721Impl();
-        nft10.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, 1000, LicenseVersion.PUBLIC);
+        FractalERC721Impl nft10 = _deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, 1000, LicenseVersion.PUBLIC);
 
         (address receiver, uint256 royaltyAmount) = nft10.royaltyInfo(1, 1 ether);
         assertEq(receiver, owner);
         assertEq(royaltyAmount, 0.1 ether); // 10%
 
         // Test with 2.5% royalty (250 basis points)
-        FractalERC721Impl nft25 = new FractalERC721Impl();
-        nft25.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, 250, LicenseVersion.PUBLIC);
+        FractalERC721Impl nft25 = _deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, 250, LicenseVersion.PUBLIC);
 
         (receiver, royaltyAmount) = nft25.royaltyInfo(1, 1 ether);
         assertEq(receiver, owner);
         assertEq(royaltyAmount, 0.025 ether); // 2.5%
 
         // Test with 0% royalty
-        FractalERC721Impl nft0 = new FractalERC721Impl();
-        nft0.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, 0, LicenseVersion.PUBLIC);
+        FractalERC721Impl nft0 = _deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, 0, LicenseVersion.PUBLIC);
 
         (receiver, royaltyAmount) = nft0.royaltyInfo(1, 1 ether);
         assertEq(receiver, owner);
@@ -1057,6 +1041,53 @@ contract FractalERC721Test is Test {
         vm.expectRevert(FractalERC721Impl.RoyaltyExceedsCap.selector);
         nft.setTokenRoyalty(1, user2, 1001);
         vm.stopPrank();
+    }
+
+    function test_Royalty_SetDefaultRoyaltyInfo_Success() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 1);
+        nft.setDefaultRoyaltyInfo(user2, 750);
+        vm.stopPrank();
+
+        (address receiver, uint256 royaltyAmount) = nft.royaltyInfo(1, 2 ether);
+
+        assertEq(receiver, user2);
+        assertEq(royaltyAmount, 0.15 ether);
+    }
+
+    function test_Royalty_SetDefaultRoyaltyInfo_RevertIf_AboveCap() public {
+        vm.startPrank(owner);
+
+        vm.expectRevert(FractalERC721Impl.RoyaltyExceedsCap.selector);
+        nft.setDefaultRoyaltyInfo(user2, 1001);
+
+        vm.stopPrank();
+    }
+
+    function test_Royalty_ResetTokenRoyalty_FallsBackToDefault() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 1);
+        nft.setTokenRoyalty(1, user2, 1000);
+        nft.resetTokenRoyalty(1);
+        vm.stopPrank();
+
+        (address receiver, uint256 royaltyAmount) = nft.royaltyInfo(1, 1 ether);
+
+        assertEq(receiver, owner);
+        assertEq(royaltyAmount, 0.05 ether);
+    }
+
+    function test_SetLicenseVersion_UpdatesLicenseMetadata() public {
+        vm.startPrank(owner);
+
+        nft.setLicenseVersion(LicenseVersion.PUBLIC);
+
+        vm.stopPrank();
+
+        assertEq(nft.getLicenseName(), "PUBLIC");
+        assertTrue(bytes(nft.getLicenseURI()).length > 0);
+        assertTrue(nft.supportsInterface(type(ICantBeEvil).interfaceId));
+        assertTrue(nft.supportsInterface(type(IERC2981).interfaceId));
     }
 
     function test_Royalty_AfterTokenTransfer() public {
@@ -1110,6 +1141,21 @@ contract FractalERC721Test is Test {
         assertEq(amount3, 0.05 ether);
     }
 
+    function test_Burn_ClearsCustomTokenURIAndAllowsRemintFallback() public {
+        vm.startPrank(owner);
+        nft.mintWithURI(user1, 77, "https://custom.example/77.json");
+        vm.stopPrank();
+
+        vm.prank(user1);
+        nft.burn(77);
+
+        vm.startPrank(owner);
+        nft.mint(user1, 77);
+        vm.stopPrank();
+
+        assertEq(nft.tokenURI(77), string.concat(BASE_URI, "77"));
+    }
+
     // ============ Fuzz Tests for Royalty ============
 
     function testFuzz_Royalty_VariousSalePrices(uint256 salePrice) public {
@@ -1141,8 +1187,7 @@ contract FractalERC721Test is Test {
     function testFuzz_Royalty_VariousFees(uint96 royaltyFee) public {
         vm.assume(royaltyFee <= 1000); // Max 10% royalty
 
-        FractalERC721Impl customNft = new FractalERC721Impl();
-        customNft.initialize(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, royaltyFee, LicenseVersion.PUBLIC);
+        FractalERC721Impl customNft = _deployProxy(NAME, SYMBOL, MAX_SUPPLY, BASE_URI, owner, royaltyFee, LicenseVersion.PUBLIC);
 
         uint256 salePrice = 1 ether;
         (address receiver, uint256 royaltyAmount) = customNft.royaltyInfo(1, salePrice);
@@ -1178,5 +1223,178 @@ contract FractalERC721Test is Test {
         nft.setBaseURI(newBaseURI);
 
         vm.stopPrank();
+    }
+
+    // ============ setLicenseVersion Tests ============
+
+    function test_SetLicenseVersion_EmitsEvent() public {
+        vm.startPrank(owner);
+
+        vm.expectEmit(true, false, false, false);
+        emit LicenseVersionSet(LicenseVersion.PUBLIC);
+        nft.setLicenseVersion(LicenseVersion.PUBLIC);
+
+        vm.stopPrank();
+        assertEq(nft.getLicenseName(), "PUBLIC");
+    }
+
+    function test_SetLicenseVersion_CyclesThroughAllVersions() public {
+        vm.startPrank(owner);
+
+        // Each transition emits the correct event and updates name/URI
+        LicenseVersion[6] memory versions = [
+            LicenseVersion.PUBLIC,
+            LicenseVersion.EXCLUSIVE,
+            LicenseVersion.COMMERCIAL,
+            LicenseVersion.COMMERCIAL_NO_HATE,
+            LicenseVersion.PERSONAL,
+            LicenseVersion.PERSONAL_NO_HATE
+        ];
+        string[6] memory names = [
+            "PUBLIC", "EXCLUSIVE", "COMMERCIAL", "COMMERCIAL_NO_HATE", "PERSONAL", "PERSONAL_NO_HATE"
+        ];
+
+        for (uint256 i = 0; i < versions.length; i++) {
+            vm.expectEmit(true, false, false, false);
+            emit LicenseVersionSet(versions[i]);
+            nft.setLicenseVersion(versions[i]);
+            assertEq(nft.getLicenseName(), names[i]);
+        }
+
+        vm.stopPrank();
+    }
+
+    function test_SetLicenseVersion_RevertIf_NotOwner() public {
+        vm.startPrank(unauthorized);
+        vm.expectRevert();
+        nft.setLicenseVersion(LicenseVersion.PUBLIC);
+        vm.stopPrank();
+    }
+
+    // ============ setDefaultRoyaltyInfo Event + Resale Tests ============
+
+    function test_SetDefaultRoyaltyInfo_EmitsDefaultRoyaltySetEvent() public {
+        vm.startPrank(owner);
+
+        vm.expectEmit(false, false, false, true);
+        emit DefaultRoyaltySet(user2, 750);
+        nft.setDefaultRoyaltyInfo(user2, 750);
+
+        vm.stopPrank();
+    }
+
+    function test_SetTokenRoyalty_EmitsTokenRoyaltySetEvent() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 1);
+
+        vm.expectEmit(true, false, false, true);
+        emit TokenRoyaltySet(1, user2, 800);
+        nft.setTokenRoyalty(1, user2, 800);
+
+        vm.stopPrank();
+    }
+
+    function test_SetDefaultRoyaltyInfo_RoyaltyPersistsAfterResale() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 1);
+
+        // Change the royalty recipient and rate
+        nft.setDefaultRoyaltyInfo(user2, 750); // 7.5%
+        vm.stopPrank();
+
+        // --- First resale: user1 -> user2 ---
+        vm.startPrank(user1);
+        nft.transferFrom(user1, user2, 1);
+        vm.stopPrank();
+
+        // Royalty info should reflect the NEW default, not initialization values
+        (address receiver, uint256 royaltyAmount) = nft.royaltyInfo(1, 1 ether);
+        assertEq(receiver, user2);
+        assertEq(royaltyAmount, 0.075 ether); // 7.5%
+
+        // --- Second resale: user2 -> user1 (token changes hands again) ---
+        vm.startPrank(user2);
+        nft.transferFrom(user2, user1, 1);
+        vm.stopPrank();
+
+        // Royalty must still reference the updated default after a second transfer
+        (receiver, royaltyAmount) = nft.royaltyInfo(1, 2 ether);
+        assertEq(receiver, user2);
+        assertEq(royaltyAmount, 0.15 ether); // 7.5% of 2 ether
+    }
+
+    function test_SetTokenRoyalty_OverridesDefaultForResale() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 1);
+        nft.mint(user1, 2);
+
+        // Per-token royalty on token 1 only
+        nft.setTokenRoyalty(1, user2, 1000); // 10%
+        vm.stopPrank();
+
+        // Token 1 resale: uses per-token royalty
+        vm.startPrank(user1);
+        nft.transferFrom(user1, user2, 1);
+        vm.stopPrank();
+
+        (address receiver1, uint256 amount1) = nft.royaltyInfo(1, 1 ether);
+        assertEq(receiver1, user2);
+        assertEq(amount1, 0.1 ether); // 10% per-token
+
+        // Token 2 resale: still uses default (5%)
+        vm.startPrank(user1);
+        nft.transferFrom(user1, user2, 2);
+        vm.stopPrank();
+
+        (address receiver2, uint256 amount2) = nft.royaltyInfo(2, 1 ether);
+        assertEq(receiver2, owner);
+        assertEq(amount2, 0.05 ether); // 5% default
+    }
+
+    function test_ResetTokenRoyalty_FallsBackToDefaultForResale() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 1);
+        nft.setTokenRoyalty(1, user2, 1000); // 10% per-token override
+
+        // Reset removes the override → falls back to default (owner, 5%)
+        nft.resetTokenRoyalty(1);
+        vm.stopPrank();
+
+        vm.startPrank(user1);
+        nft.transferFrom(user1, user2, 1);
+        vm.stopPrank();
+
+        (address receiver, uint256 amount) = nft.royaltyInfo(1, 1 ether);
+        assertEq(receiver, owner);
+        assertEq(amount, 0.05 ether);
+    }
+
+    function test_DefaultRoyaltySet_UpdateAffectsAllUnoverriddentTokensOnResale() public {
+        vm.startPrank(owner);
+        nft.mint(user1, 1);
+        nft.mint(user1, 2);
+        nft.mint(user1, 3);
+
+        // Token 2 gets a per-token override; tokens 1 and 3 use default
+        nft.setTokenRoyalty(2, user2, 800); // 8%
+
+        // Change the default
+        nft.setDefaultRoyaltyInfo(user1, 300); // 3%
+        vm.stopPrank();
+
+        // Token 1 (no override) should use the new default
+        (address r1, uint256 a1) = nft.royaltyInfo(1, 1 ether);
+        assertEq(r1, user1);
+        assertEq(a1, 0.03 ether);
+
+        // Token 2 (has override) must NOT be affected by default change
+        (address r2, uint256 a2) = nft.royaltyInfo(2, 1 ether);
+        assertEq(r2, user2);
+        assertEq(a2, 0.08 ether);
+
+        // Token 3 (no override) should also use the new default
+        (address r3, uint256 a3) = nft.royaltyInfo(3, 1 ether);
+        assertEq(r3, user1);
+        assertEq(a3, 0.03 ether);
     }
 }

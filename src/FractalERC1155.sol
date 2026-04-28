@@ -37,6 +37,12 @@ contract FractalERC1155Impl is
     event BaseURISet(string baseURI);
     event LicenseVersionSet(LicenseVersion indexed licenseVersion);
     event TokenRoyaltySet(uint256 indexed tokenId, address receiver, uint96 feeNumerator);
+    event DefaultRoyaltySet(address receiver, uint96 feeNumerator);
+    event ContractUpgraded(address indexed newImplementation, uint8 version);
+
+    constructor() {
+        _disableInitializers();
+    }
 
     // note: maxSupply is only set for token ID 0 during initialization, for other IDs it can be set later using the setMaxSupply function
     /**
@@ -71,6 +77,10 @@ contract FractalERC1155Impl is
         maxSupply[0] = _maxSupply;
 
         emit LicenseVersionSet(_licenseVersion);
+    }
+
+    function version() public pure returns (uint8) {
+        return uint8(2);
     }
 
     function mint(address _to, uint256 _id, uint256 _amount, bytes memory _data) external onlyOwner {
@@ -113,6 +123,12 @@ contract FractalERC1155Impl is
         emit TokenRoyaltySet(_tokenId, _receiver, _feeNumerator);
     }
 
+    function setDefaultRoyaltyInfo(address _receiver, uint96 _feeNumerator) external onlyOwner {
+        if (_feeNumerator > MAX_ROYALTY_BPS) revert RoyaltyExceedsCap();
+        _setDefaultRoyalty(_receiver, _feeNumerator);
+        emit DefaultRoyaltySet(_receiver, _feeNumerator);
+    }
+
     function resetTokenRoyalty(uint256 _tokenId) external onlyOwner {
         _resetTokenRoyalty(_tokenId);
     }
@@ -136,6 +152,11 @@ contract FractalERC1155Impl is
         }
         string memory baseURI = super.uri(_id);
         return bytes(baseURI).length > 0 ? string.concat(baseURI, Strings.toString(_id)) : "";
+    }
+
+    function setLicenseVersion(LicenseVersion _licenseVersion) external onlyOwner {
+        licenseVersion = _licenseVersion;
+        emit LicenseVersionSet(_licenseVersion);
     }
 
     function burn(address _from, uint256 _id, uint256 _amount) external {
@@ -176,5 +197,7 @@ contract FractalERC1155Impl is
     /**
      * @dev UUPS Upgrade authorization - only owner can upgrade
      */
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        emit ContractUpgraded(newImplementation, version());
+    }
 }
