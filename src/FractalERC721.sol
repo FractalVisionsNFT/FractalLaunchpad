@@ -35,9 +35,9 @@ contract FractalERC721Impl is
 
     event MaxSupplySet(uint256 maxSupply);
     event BaseURISet(string baseURI);
-    event LicenseVersionSet(LicenseVersion indexed licenseVersion);
-    event TokenRoyaltySet(uint256 indexed tokenId, address receiver, uint96 feeNumerator);
-    event DefaultRoyaltySet(address receiver, uint96 feeNumerator);
+    event LicenseVersionSet(LicenseVersion licenseVersion);
+    event TokenRoyaltySet(uint256 indexed tokenId, address indexed receiver, uint96 feeNumerator);
+    event DefaultRoyaltySet(address indexed receiver, uint96 feeNumerator);
     event ContractUpgraded(address indexed newImplementation, uint8 version);
 
     // EIP-4906
